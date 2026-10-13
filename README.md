@@ -3,7 +3,7 @@
 > 面向老年人的离线语音智能药盒及云平台 —— 「智能药盒 + 云平台 + 子女端小程序」一体化用药管理方案
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-2E7D6F.svg)](LICENSE)
-[![云平台测试](https://github.com/old-bb/zhihyao/actions/workflows/tests.yml/badge.svg)](https://github.com/old-bb/zhihyao/actions/workflows/tests.yml)
+[![云平台测试](https://github.com/old-bb/smart-pillbox/actions/workflows/tests.yml/badge.svg)](https://github.com/old-bb/smart-pillbox/actions/workflows/tests.yml)
 ![Platform](https://img.shields.io/badge/platform-Orange%20Pi%204%20Pro%20%7C%20%E5%BE%AE%E4%BF%A1%E5%B0%8F%E7%A8%8B%E5%BA%8F-4A9D8E.svg)
 
 **项目编号**：202610042210　｜　**项目类别**：国家级大学生创新创业训练计划（创业训练）　｜　**院校**：国际关系学院
