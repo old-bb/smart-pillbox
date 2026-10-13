@@ -27,12 +27,12 @@ jobs:
 
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 安装 Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
 
       # 测试用内存替身替代 wx-server-sdk，无需 npm install、不联网、不消耗云开发额度
       - name: 运行测试
