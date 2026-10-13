@@ -1,0 +1,164 @@
+<view class="page">
+
+  <!-- 老人档案 -->
+  <view class="card">
+    <view class="card-title">
+      <text>老人档案</text>
+      <text class="more" bindtap="onAdd">+ 添加</text>
+    </view>
+
+    <view wx:if="{{loading}}" class="text-muted">加载中…</view>
+
+    <view wx:elif="{{elders.length === 0}}" class="empty" style="padding:48rpx 0">
+      <view class="empty-desc">添加档案后，可以把药盒关联到具体的人</view>
+    </view>
+
+    <view wx:else>
+      <view wx:for="{{elders}}" wx:key="_id" class="elder-row">
+        <view class="elder-avatar">{{item.name[0]}}</view>
+        <view class="elder-body">
+          <view class="elder-name">
+            {{item.name}}
+            <text wx:if="{{item.age}}" class="text-muted">　{{item.age}} 岁</text>
+            <text class="text-muted">
+              　{{item.gender === 'male' ? '男' : (item.gender === 'female' ? '女' : '')}}
+            </text>
+          </view>
+          <view class="elder-conditions">
+            <text wx:if="{{item.conditions.length === 0}}" class="text-muted">未填写病史</text>
+            <text wx:for="{{item.conditions}}" wx:for-item="c" wx:key="*this" class="cond-tag">{{c}}</text>
+          </view>
+          <view class="text-muted elder-devices">已绑定 {{item.deviceCount}} 台药盒</view>
+        </view>
+        <view class="elder-actions">
+          <view class="elder-action" data-id="{{item._id}}" bindtap="onEdit">编辑</view>
+          <view class="elder-action danger" data-id="{{item._id}}" bindtap="onDelete">删除</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 用药提醒推送 -->
+  <view class="card">
+    <view class="card-title">
+      <text>用药提醒推送</text>
+      <text class="more" wx:if="{{notifyConfigured}}">剩余 {{notifyQuota}} 次</text>
+    </view>
+
+    <view class="notify-box {{notifyLow ? 'notify-low' : ''}}">
+      <view class="notify-text">
+        <block wx:if="{{!notifyConfigured}}">
+          还没配置订阅消息模板，去小程序后台申请后填到 utils/subscribe.js
+        </block>
+        <block wx:elif="{{notifyQuota <= 0}}">
+          推送额度用完了。现在父母漏服药时，你<text class="text-bold">不会</text>收到微信通知，只能自己打开小程序看。
+        </block>
+        <block wx:elif="{{notifyLow}}">
+          只剩 {{notifyQuota}} 次推送额度了，建议补充。额度用完后就收不到漏服提醒了。
+        </block>
+        <block wx:else>
+          已开启。父母漏服药或药品快用完时，会通过微信通知你。
+        </block>
+      </view>
+      <button
+        wx:if="{{notifyConfigured && notifyLow}}"
+        class="btn btn-primary notify-btn"
+        bindtap="onEnableNotify">{{notifyQuota > 0 ? '补充额度' : '开启提醒推送'}}</button>
+    </view>
+  </view>
+
+  <!-- 设置 -->
+  <view class="card">
+    <view class="card-title"><text>设置</text></view>
+
+    <view class="setting-row" bindtap="onCopyOpenid">
+      <text>我的账号标识</text>
+      <text class="setting-value">{{openid ? '点击复制' : '未登录'}}</text>
+    </view>
+
+    <view class="setting-row" bindtap="onAbout">
+      <text>关于本项目</text>
+      <text class="setting-value">›</text>
+    </view>
+
+    <view class="setting-row">
+      <text>未读提醒</text>
+      <text class="setting-value">{{alertCount}} 条</text>
+    </view>
+  </view>
+
+  <!-- 说明 -->
+  <view class="card">
+    <view class="note">
+      <view class="note-title">关于数据安全</view>
+      <view class="note-body">
+        父母的服药数据属于个人健康信息。本小程序所有数据读写都经由服务端云函数完成，
+        客户端不直连数据库；每个账号只能访问自己绑定的数据。
+        后续将按《个人信息保护法》要求补齐授权流程与数据保留策略。
+      </view>
+    </view>
+  </view>
+
+  <view style="height:60rpx"></view>
+
+  <!-- 编辑面板 -->
+  <view wx:if="{{showEditor}}" class="mask" bindtap="onCloseEditor">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{form._id ? '编辑档案' : '添加档案'}}</text>
+        <text class="sheet-close" bindtap="onCloseEditor">✕</text>
+      </view>
+
+      <scroll-view scroll-y class="sheet-body">
+        <view class="field">
+          <view class="field-label">姓名</view>
+          <input class="field-input" value="{{form.name}}" placeholder="如：张桂英"
+                 data-field="name" bindinput="onFormInput" />
+        </view>
+
+        <view class="field-row">
+          <view class="field half">
+            <view class="field-label">年龄</view>
+            <input class="field-input" type="number" value="{{form.age}}" placeholder="如：72"
+                   data-field="age" bindinput="onFormInput" />
+          </view>
+          <view class="field half">
+            <view class="field-label">性别</view>
+            <view class="gender-row">
+              <view class="gender-opt {{form.gender === 'male' ? 'active' : ''}}"
+                    data-value="male" bindtap="onGenderTap">男</view>
+              <view class="gender-opt {{form.gender === 'female' ? 'active' : ''}}"
+                    data-value="female" bindtap="onGenderTap">女</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="field">
+          <view class="field-label">慢性病史（可多选）</view>
+          <view class="cond-picker">
+            <view
+              wx:for="{{conditions}}"
+              wx:key="*this"
+              class="cond-opt {{form.conditions.indexOf(item) >= 0 ? 'active' : ''}}"
+              data-value="{{item}}"
+              bindtap="onConditionTap">{{item}}</view>
+          </view>
+        </view>
+
+        <view class="field">
+          <view class="field-label">备注（选填）</view>
+          <input class="field-input" value="{{form.note}}" placeholder="如：听力较弱，播报音量调到最大"
+                 data-field="note" bindinput="onFormInput" />
+        </view>
+      </scroll-view>
+
+      <view class="sheet-foot">
+        <button class="btn btn-plain" bindtap="onCloseEditor">取消</button>
+        <button class="btn btn-primary" bindtap="onSubmit" disabled="{{submitting}}">
+          {{submitting ? '保存中…' : '保存'}}
+        </button>
+      </view>
+    </view>
+  </view>
+
+</view>

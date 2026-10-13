@@ -1,0 +1,142 @@
+<view class="page">
+
+  <view wx:if="{{loading}}" class="empty">
+    <view class="empty-title">正在加载…</view>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{devices.length === 0}}" class="empty">
+      <view class="empty-title">还没有绑定药盒</view>
+      <view class="empty-desc">绑定码印在药盒机身底部，是一串 6 位字母数字</view>
+    </view>
+
+    <view wx:for="{{devices}}" wx:key="_id" class="card">
+      <view class="row-between">
+        <view class="row">
+          <view class="dev-dot {{item.online ? 'dot-online' : 'dot-offline'}}"></view>
+          <view class="dev-name">{{item.name}}</view>
+        </view>
+        <view class="tag {{item.online ? 'tag-on_time' : 'tag-upcoming'}}">
+          {{item.online ? '在线' : '离线'}}
+        </view>
+      </view>
+
+      <view class="dev-id">{{item.deviceId}}</view>
+
+      <view class="dev-stats">
+        <view class="dev-stat">
+          <view class="dev-stat-num">{{item.planCount}}</view>
+          <view class="text-muted">生效计划</view>
+        </view>
+        <view class="dev-stat">
+          <view class="dev-stat-num">{{item.batteryText}}</view>
+          <view class="text-muted">电量</view>
+        </view>
+        <view class="dev-stat">
+          <view class="dev-stat-num">{{item.bayCount}}</view>
+          <view class="text-muted">药仓数</view>
+        </view>
+      </view>
+
+      <view class="text-muted dev-seen">
+        {{item.elderName ? item.elderName : '未关联老人'}} · 最近上报 {{item.lastSeenText}}
+      </view>
+
+      <view class="divider"></view>
+
+      <view class="dev-actions">
+        <view class="dev-action" data-id="{{item._id}}" bindtap="onOpenBays">药仓配置</view>
+        <view class="dev-action" data-id="{{item._id}}" bindtap="onSimulate">模拟上报</view>
+        <view class="dev-action danger" data-id="{{item._id}}" bindtap="onUnbind">解绑</view>
+      </view>
+    </view>
+
+    <view style="height:160rpx"></view>
+  </block>
+
+  <view class="fab-bar">
+    <button class="btn btn-primary" bindtap="onOpenBind">+ 绑定新药盒</button>
+  </view>
+
+  <!-- 绑定面板 -->
+  <view wx:if="{{showBind}}" class="mask" bindtap="onCloseBind">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">绑定药盒</text>
+        <text class="sheet-close" bindtap="onCloseBind">✕</text>
+      </view>
+
+      <view class="sheet-body-simple">
+        <view class="field">
+          <view class="field-label">绑定码</view>
+          <input
+            class="field-input"
+            value="{{bindCode}}"
+            placeholder="药盒底部的 6 位编码"
+            maxlength="16"
+            bindinput="onBindCodeInput" />
+        </view>
+
+        <view class="field" wx:if="{{elders.length > 0}}">
+          <view class="field-label">关联老人</view>
+          <picker mode="selector" range="{{elders}}" range-key="name" bindchange="onElderChange">
+            <view class="field-value">
+              {{elders[bindElderIndex].name || '暂不关联'}}
+            </view>
+          </picker>
+        </view>
+
+        <view class="sheet-tip">
+          开发阶段没有实体药盒也能绑定：随便填一个编码即可，
+          绑定后用「模拟上报」验证全链路。
+        </view>
+      </view>
+
+      <view class="sheet-foot">
+        <button class="btn btn-plain" bindtap="onCloseBind">取消</button>
+        <button class="btn btn-primary" bindtap="onBindSubmit" disabled="{{binding}}">
+          {{binding ? '绑定中…' : '确认绑定'}}
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 药仓配置面板 -->
+  <view wx:if="{{showBays}}" class="mask" bindtap="onCloseBays">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">药仓配置</text>
+        <text class="sheet-close" bindtap="onCloseBays">✕</text>
+      </view>
+
+      <scroll-view scroll-y class="sheet-body">
+        <view wx:for="{{bayList}}" wx:key="index" class="bay-edit">
+          <view class="bay-edit-head">{{item.label}}</view>
+          <input
+            class="field-input bay-input"
+            value="{{item.medicineName}}"
+            placeholder="这个仓放什么药"
+            data-index="{{index}}"
+            bindinput="onBayMedicineInput" />
+          <input
+            class="field-input bay-input"
+            value="{{item.customVoice}}"
+            placeholder="自定义播报词（留空则用药品名）"
+            data-index="{{index}}"
+            bindinput="onBayVoiceInput" />
+        </view>
+
+        <view class="sheet-tip">
+          播报词会同步给药盒，老人按确认键时由喇叭读出。
+          建议填「降压药，一片，饭后吃」这种口语化短句，比药名更好懂。
+        </view>
+      </scroll-view>
+
+      <view class="sheet-foot">
+        <button class="btn btn-plain" bindtap="onCloseBays">取消</button>
+        <button class="btn btn-primary" bindtap="onSaveBays">保存</button>
+      </view>
+    </view>
+  </view>
+
+</view>

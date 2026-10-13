@@ -1,0 +1,52 @@
+# ══════════════════════════════════════════════════════════════
+#  智药云联 · 换行符规范
+# ══════════════════════════════════════════════════════════════
+#
+#  为什么需要这个文件：
+#  Windows 默认把文本文件的换行符转成 CRLF，但本项目代码最终跑在
+#  Linux（Orange Pi 4 Pro / Armbian）上。带 CRLF 的 shell 脚本复制到
+#  板子上会直接报错：/bin/bash^M: bad interpreter。
+#
+#  下面的规则强制所有源码在仓库里统一用 LF，避免这类问题。
+
+# ── 默认：自动判断文本文件，跨平台保持换行一致 ──
+* text=auto eol=lf
+
+# ── 必须用 LF 的文件（在 Linux 上执行）──
+*.sh      text eol=lf
+*.py      text eol=lf
+*.js      text eol=lf
+*.json    text eol=lf
+*.wxml    text eol=lf
+*.wxss    text eol=lf
+*.md      text eol=lf
+*.yml     text eol=lf
+*.txt     text eol=lf
+
+# ── Windows 下才用的批处理文件保留 CRLF ──
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+
+# ── 二进制文件：禁止任何换行符转换 ──
+*.docx    binary
+*.doc     binary
+*.pptx    binary
+*.ppt     binary
+*.xlsx    binary
+*.pdf     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.wav     binary
+*.mp3     binary
+*.zip     binary
+*.so      binary
+*.pyc     binary
+
+# ── 让 git diff 能正确识别语言，也让 GitHub 统计更准 ──
+*.py      diff=python
+*.js      diff=javascript
+*.json    diff=json

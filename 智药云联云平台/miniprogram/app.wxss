@@ -1,0 +1,183 @@
+/* 智药云联 · 全局样式
+   面向的是子女端（30~45 岁），所以审美偏现代，
+   但关键信息（服药状态、时间、药名）字号偏大，方便快速扫读。 */
+
+page {
+  background: #F5F6F8;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  color: #1F2429;
+  font-size: 28rpx;
+  line-height: 1.5;
+}
+
+/* ── 布局 ── */
+.page {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+}
+
+.card {
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 32rpx;
+  margin: 24rpx 24rpx 0;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.04);
+}
+
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1F2429;
+  margin-bottom: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title .more {
+  font-size: 24rpx;
+  font-weight: 400;
+  color: #9AA0A6;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── 文字 ── */
+.text-muted { color: #9AA0A6; font-size: 24rpx; }
+.text-sub   { color: #6B7280; font-size: 26rpx; }
+.text-lg    { font-size: 36rpx; font-weight: 600; }
+.text-xl    { font-size: 64rpx; font-weight: 700; }
+.text-bold  { font-weight: 600; }
+.text-primary { color: #2E7D6F; }
+.text-danger  { color: #D9534F; }
+.text-warn    { color: #E8A33D; }
+
+/* ── 状态标签 ── */
+.tag {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 100rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+.tag-on_time { background: #E6F4F1; color: #2E7D6F; }
+.tag-early   { background: #EAF2FB; color: #3B7DD8; }
+.tag-late    { background: #FDF3E3; color: #C98A22; }
+.tag-missed  { background: #FCEAEA; color: #D9534F; }
+.tag-upcoming{ background: #F0F1F3; color: #9AA0A6; }
+.tag-pending { background: #FDF3E3; color: #C98A22; }
+.tag-high    { background: #FCEAEA; color: #D9534F; }
+.tag-medium  { background: #FDF3E3; color: #C98A22; }
+
+/* ── 按钮 ── */
+.btn {
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+.btn::after { border: none; }
+
+.btn-primary {
+  background: #2E7D6F;
+  color: #FFFFFF;
+}
+.btn-primary[disabled] {
+  background: #B8CFCB;
+  color: #FFFFFF;
+}
+
+.btn-ghost {
+  background: #FFFFFF;
+  color: #2E7D6F;
+  border: 2rpx solid #2E7D6F;
+}
+
+.btn-plain {
+  background: #F0F1F3;
+  color: #4B5563;
+}
+
+/* ── 进度条 ── */
+.progress-track {
+  height: 16rpx;
+  background: #EDEFF2;
+  border-radius: 100rpx;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4A9D8E, #2E7D6F);
+  border-radius: 100rpx;
+  transition: width 0.4s ease;
+}
+
+/* ── 空状态 ── */
+.empty {
+  padding: 120rpx 48rpx;
+  text-align: center;
+}
+.empty-title {
+  font-size: 30rpx;
+  color: #4B5563;
+  margin-bottom: 12rpx;
+}
+.empty-desc {
+  font-size: 26rpx;
+  color: #9AA0A6;
+  line-height: 1.7;
+}
+
+/* ── 分割线 ── */
+.divider {
+  height: 1rpx;
+  background: #EDEFF2;
+  margin: 24rpx 0;
+}
+
+/* ── 药仓格子 ── */
+.bay-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.bay-cell {
+  width: calc((100% - 32rpx) / 3);
+  background: #F7F8FA;
+  border-radius: 16rpx;
+  padding: 20rpx 16rpx;
+  box-sizing: border-box;
+  border: 2rpx solid transparent;
+}
+.bay-cell.active {
+  background: #E6F4F1;
+  border-color: #2E7D6F;
+}
+.bay-index {
+  font-size: 22rpx;
+  color: #9AA0A6;
+  margin-bottom: 8rpx;
+}
+.bay-medicine {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #1F2429;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bay-medicine.empty-text {
+  color: #C4C9CF;
+  font-weight: 400;
+}

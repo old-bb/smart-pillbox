@@ -1,0 +1,32 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/records/records",
+    "pages/plans/plans",
+    "pages/device/device",
+    "pages/profile/profile"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#2E7D6F",
+    "navigationBarTitleText": "智药云联",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F5F6F8"
+  },
+  "tabBar": {
+    "color": "#9AA0A6",
+    "selectedColor": "#2E7D6F",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "守护" },
+      { "pagePath": "pages/records/records", "text": "记录" },
+      { "pagePath": "pages/plans/plans", "text": "用药" },
+      { "pagePath": "pages/device/device", "text": "药盒" },
+      { "pagePath": "pages/profile/profile", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

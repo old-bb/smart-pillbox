@@ -1,0 +1,183 @@
+<view class="page">
+
+  <view wx:if="{{loading}}" class="empty">
+    <view class="empty-title">正在加载…</view>
+  </view>
+
+  <block wx:else>
+    <!-- 空状态 -->
+    <view wx:if="{{plans.length === 0}}" class="empty">
+      <view class="empty-title">还没有用药计划</view>
+      <view class="empty-desc">添加计划后，药盒会按时提醒，这里也能看到服药统计</view>
+    </view>
+
+    <!-- 计划列表 -->
+    <view wx:for="{{plans}}" wx:key="_id" class="card plan-card {{item.active ? '' : 'inactive'}}">
+      <view class="row-between plan-head">
+        <view class="row">
+          <view class="plan-bay">{{item.bayIndex + 1}}号仓</view>
+          <view class="plan-name">{{item.medicineName}}</view>
+        </view>
+        <view class="tag {{item.active ? 'tag-on_time' : 'tag-upcoming'}}">
+          {{item.active ? '生效中' : '已停用'}}
+        </view>
+      </view>
+
+      <view class="plan-times">{{item.timesText}}</view>
+
+      <view class="plan-meta">
+        <text>{{item.dosageText}} / 次</text>
+        <text class="plan-dot">·</text>
+        <text>{{item.mealRelation}}</text>
+        <text class="plan-dot">·</text>
+        <text>每日 {{item.dailyConsumption}} 片</text>
+      </view>
+
+      <view class="plan-stock">
+        <text class="text-muted">库存 {{item.stock}} 片</text>
+        <text class="stock-tag stock-{{item.stockLevel}}">{{item.stockText}}</text>
+        <view
+          wx:if="{{item.lowStock}}"
+          class="restock-btn"
+          data-id="{{item._id}}"
+          bindtap="onRestock">去补药 ›</view>
+      </view>
+
+      <view class="divider"></view>
+
+      <view class="plan-actions">
+        <view class="plan-action" data-id="{{item._id}}" bindtap="onEdit">编辑</view>
+        <view class="plan-action" data-id="{{item._id}}" data-active="{{item.active}}" bindtap="onToggle">
+          {{item.active ? '停用' : '启用'}}
+        </view>
+        <view class="plan-action danger" data-id="{{item._id}}" bindtap="onDelete">删除</view>
+      </view>
+    </view>
+
+    <view style="height:160rpx"></view>
+  </block>
+
+  <!-- 底部按钮 -->
+  <view class="fab-bar">
+    <button class="btn btn-primary" bindtap="onAdd">+ 添加用药计划</button>
+  </view>
+
+  <!-- 编辑面板 -->
+  <view wx:if="{{showEditor}}" class="mask" bindtap="onMaskTap">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{form._id ? '编辑计划' : '添加计划'}}</text>
+        <text class="sheet-close" bindtap="onCloseEditor">✕</text>
+      </view>
+
+      <scroll-view scroll-y class="sheet-body">
+
+        <!-- 设备 -->
+        <view class="field" wx:if="{{devices.length > 1}}">
+          <view class="field-label">药盒设备</view>
+          <picker mode="selector" range="{{devices}}" range-key="name" bindchange="onDeviceChange">
+            <view class="field-value">
+              {{form.deviceId ? '' : '请选择'}}
+              <block wx:for="{{devices}}" wx:key="_id">
+                <text wx:if="{{item._id === form.deviceId}}">{{item.name}}</text>
+              </block>
+            </view>
+          </picker>
+        </view>
+
+        <!-- 药仓 -->
+        <view class="field">
+          <view class="field-label">药仓位置</view>
+          <view class="bay-picker">
+            <view
+              wx:for="{{bayOptions}}"
+              wx:key="index"
+              class="bay-opt {{form.bayIndex === item.index ? 'active' : ''}} {{item.disabled ? 'disabled' : ''}}"
+              data-index="{{item.index}}"
+              bindtap="onBaySelect">
+              <view>{{item.label}}</view>
+              <view wx:if="{{item.hint}}" class="bay-opt-hint">{{item.hint}}</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 药品名称 -->
+        <view class="field">
+          <view class="field-label">药品名称</view>
+          <input
+            class="field-input"
+            value="{{form.medicineName}}"
+            placeholder="如：苯磺酸氨氯地平片"
+            data-field="medicineName"
+            bindinput="onFormInput" />
+        </view>
+
+        <!-- 每次用量 -->
+        <view class="field-row">
+          <view class="field half">
+            <view class="field-label">每次用量（片）</view>
+            <input
+              class="field-input"
+              type="digit"
+              value="{{form.perDose}}"
+              data-field="perDose"
+              bindinput="onFormInput" />
+          </view>
+          <view class="field half">
+            <view class="field-label">当前库存（片）</view>
+            <input
+              class="field-input"
+              type="number"
+              value="{{form.stock}}"
+              data-field="stock"
+              bindinput="onFormInput" />
+          </view>
+        </view>
+
+        <!-- 服药时间 -->
+        <view class="field">
+          <view class="field-label">服药时间</view>
+          <view wx:for="{{form.times}}" wx:key="index" class="time-row">
+            <picker mode="time" value="{{item}}" data-index="{{index}}" bindchange="onTimeChange">
+              <view class="time-value">{{item}}</view>
+            </picker>
+            <view class="time-del" data-index="{{index}}" bindtap="onRemoveTime">删除</view>
+          </view>
+          <view class="time-add" bindtap="onAddTime">+ 添加时间点</view>
+        </view>
+
+        <!-- 进餐关系 -->
+        <view class="field">
+          <view class="field-label">服用方式</view>
+          <picker mode="selector" range="{{mealRelations}}" bindchange="onMealChange">
+            <view class="field-value">{{form.mealRelation}}</view>
+          </picker>
+        </view>
+
+        <!-- 备注 -->
+        <view class="field">
+          <view class="field-label">备注（选填）</view>
+          <input
+            class="field-input"
+            value="{{form.note}}"
+            placeholder="如：血压偏高时遵医嘱加服"
+            data-field="note"
+            bindinput="onFormInput" />
+        </view>
+
+        <view class="sheet-tip">
+          每日消耗 {{dailyHint}} 片，当前库存可支撑约 {{daysHint}} 天
+        </view>
+
+      </scroll-view>
+
+      <view class="sheet-foot">
+        <button class="btn btn-plain" bindtap="onCloseEditor">取消</button>
+        <button class="btn btn-primary" bindtap="onSubmit" disabled="{{submitting}}">
+          {{submitting ? '保存中…' : '保存'}}
+        </button>
+      </view>
+    </view>
+  </view>
+
+</view>

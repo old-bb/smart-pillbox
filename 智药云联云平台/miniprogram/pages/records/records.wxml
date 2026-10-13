@@ -1,0 +1,92 @@
+<view class="page">
+
+  <!-- 30 天依从性概览 -->
+  <view class="card" wx:if="{{adherence && adherence.score !== null}}">
+    <view class="card-title"><text>近 30 天依从性</text></view>
+    <view class="adh-row">
+      <view class="adh-score">
+        <text class="text-xl text-primary">{{adherence.score}}</text>
+        <text class="text-muted">分</text>
+      </view>
+      <view class="adh-stats">
+        <view class="adh-stat">
+          <text class="adh-num">{{adherence.byStatus.on_time || 0}}</text>
+          <text class="text-muted">按时</text>
+        </view>
+        <view class="adh-stat">
+          <text class="adh-num">{{adherence.byStatus.late || 0}}</text>
+          <text class="text-muted">延迟</text>
+        </view>
+        <view class="adh-stat">
+          <text class="adh-num text-danger">{{adherence.byStatus.missed || 0}}</text>
+          <text class="text-muted">漏服</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 逐药品明细，优先暴露最差的 -->
+    <view wx:if="{{adherence.byMedicine.length > 0}}" class="divider"></view>
+    <view wx:for="{{adherence.byMedicine}}" wx:key="name" class="med-row">
+      <view class="med-name">{{item.name}}</view>
+      <view class="med-bar">
+        <view class="med-bar-fill" style="width:{{item.score}}%"></view>
+      </view>
+      <view class="med-score">{{item.score}}%</view>
+    </view>
+  </view>
+
+  <!-- 筛选 -->
+  <view class="filter-bar">
+    <view
+      wx:for="{{filters}}"
+      wx:key="key"
+      class="filter-item {{activeFilter === item.key ? 'active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onFilterTap">{{item.label}}</view>
+  </view>
+
+  <!-- 加载中 -->
+  <view wx:if="{{loading}}" class="empty">
+    <view class="empty-title">正在加载…</view>
+  </view>
+
+  <!-- 空 -->
+  <view wx:elif="{{groups.length === 0}}" class="empty">
+    <view class="empty-title">还没有服药记录</view>
+    <view class="empty-desc">药盒上报数据后，这里会显示详细记录</view>
+  </view>
+
+  <!-- 记录列表 -->
+  <block wx:else>
+    <view wx:for="{{groups}}" wx:for-item="group" wx:key="date" class="card">
+      <view class="card-title">
+        <text>{{group.dateLabel}}</text>
+        <text class="more">{{group.date}}</text>
+      </view>
+
+      <view wx:for="{{group.items}}" wx:key="_id" class="rec">
+        <view class="rec-left">
+          <view class="rec-time">{{item.timeText}}</view>
+          <view wx:if="{{item.actualText && item.status !== 'missed'}}" class="rec-actual">
+            实服 {{item.actualText}}
+          </view>
+        </view>
+
+        <view class="rec-body">
+          <view class="rec-name">{{item.medicineName}}</view>
+          <view class="rec-meta">
+            {{item.dosageText}} · {{item.bayIndex + 1}}号仓
+            <text wx:if="{{item.sourceLabel}}"> · {{item.sourceLabel}}</text>
+          </view>
+          <view wx:if="{{item.diffLabel}}" class="rec-meta">{{item.diffLabel}}</view>
+        </view>
+
+        <view class="tag {{item.statusTag}}">{{item.statusLabel}}</view>
+      </view>
+    </view>
+
+    <view wx:if="{{hasMore}}" class="load-more">上拉加载更多</view>
+    <view wx:else class="load-more">— 没有更多了 —</view>
+  </block>
+
+</view>

@@ -1,0 +1,176 @@
+/* 药盒设备管理 */
+
+.dev-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+.dot-online { background: #2E7D6F; box-shadow: 0 0 0 6rpx rgba(46, 125, 111, 0.15); }
+.dot-offline { background: #C4C9CF; }
+
+.dev-name {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.dev-id {
+  font-size: 22rpx;
+  color: #9AA0A6;
+  margin-top: 8rpx;
+  font-family: monospace;
+}
+
+.dev-stats {
+  display: flex;
+  margin: 28rpx 0 20rpx;
+}
+
+.dev-stat {
+  flex: 1;
+  text-align: center;
+}
+
+.dev-stat-num {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #1F2429;
+  margin-bottom: 4rpx;
+}
+
+.dev-seen {
+  font-size: 22rpx;
+}
+
+.dev-actions {
+  display: flex;
+  justify-content: space-around;
+}
+
+.dev-action {
+  font-size: 27rpx;
+  color: #2E7D6F;
+  padding: 8rpx 24rpx;
+}
+
+.dev-action.danger {
+  color: #D9534F;
+}
+
+/* ── 面板 ── */
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 88vh;
+  background: #FFFFFF;
+  border-radius: 28rpx 28rpx 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 32rpx 16rpx;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+
+.sheet-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.sheet-close {
+  font-size: 32rpx;
+  color: #9AA0A6;
+  padding: 0 12rpx;
+}
+
+.sheet-body {
+  flex: 1;
+  max-height: 60vh;
+  padding: 24rpx 32rpx;
+}
+
+.sheet-body-simple {
+  padding: 24rpx 32rpx 32rpx;
+}
+
+.sheet-foot {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid #F0F1F3;
+}
+
+.sheet-foot .btn {
+  flex: 1;
+}
+
+.sheet-tip {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #6B7280;
+  line-height: 1.7;
+}
+
+/* 表单 */
+.field {
+  margin-bottom: 32rpx;
+}
+
+.field-label {
+  font-size: 26rpx;
+  color: #6B7280;
+  margin-bottom: 14rpx;
+}
+
+.field-input,
+.field-value {
+  height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+/* 药仓编辑 */
+.bay-edit {
+  margin-bottom: 32rpx;
+}
+
+.bay-edit-head {
+  font-size: 27rpx;
+  font-weight: 600;
+  color: #2E7D6F;
+  margin-bottom: 14rpx;
+}
+
+.bay-input {
+  margin-bottom: 12rpx;
+}
+
+.fab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1rpx solid #EDEFF2;
+}

@@ -1,0 +1,39 @@
+name: 云平台测试
+
+# 只跑云函数的本地测试套件。
+# 说明：硬件端 test_logic.py 依赖模拟 GPIO 与 Windows 控制台编码，
+# 在 Linux runner 上会因编码问题失败，故本工作流只覆盖云平台部分。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '智药云联云平台/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '智药云联云平台/**'
+  workflow_dispatch:
+
+jobs:
+  cloud-tests:
+    name: 运行云函数测试
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: 智药云联云平台
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 测试用内存替身替代 wx-server-sdk，无需 npm install、不联网、不消耗云开发额度
+      - name: 运行测试
+        run: node tests/run.js

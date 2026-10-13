@@ -1,0 +1,249 @@
+/* 首页看板 */
+
+.hero {
+  margin: 24rpx;
+  padding: 40rpx 36rpx 32rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #2E7D6F, #4A9D8E);
+  color: #FFFFFF;
+  box-shadow: 0 8rpx 24rpx rgba(46, 125, 111, 0.25);
+}
+
+.hero-date {
+  font-size: 24rpx;
+  opacity: 0.85;
+  margin-bottom: 16rpx;
+}
+
+.hero-main {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.hero-count {
+  display: flex;
+  align-items: baseline;
+}
+
+.hero-total {
+  font-size: 32rpx;
+  opacity: 0.75;
+  margin-left: 8rpx;
+}
+
+.hero-label {
+  font-size: 26rpx;
+  opacity: 0.9;
+  padding-bottom: 12rpx;
+}
+
+.hero-progress {
+  background: rgba(255, 255, 255, 0.25);
+  margin-top: 24rpx;
+}
+
+.hero-progress .progress-fill {
+  background: #FFFFFF;
+}
+
+.hero-next {
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+}
+
+.hero-next-label {
+  font-size: 24rpx;
+  opacity: 0.85;
+  margin-right: 16rpx;
+}
+
+.hero-next-time {
+  font-size: 36rpx;
+  font-weight: 600;
+  margin-right: 16rpx;
+}
+
+.hero-next-med {
+  font-size: 26rpx;
+  opacity: 0.9;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 依从性评分 */
+.score-num {
+  font-size: 72rpx;
+  font-weight: 700;
+  line-height: 1;
+  margin-right: 20rpx;
+}
+
+.score-right {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.score-sub {
+  font-size: 22rpx;
+}
+
+.score-missed {
+  text-align: right;
+  font-size: 24rpx;
+}
+
+/* 趋势图 */
+.trend-wrap {
+  margin-top: 8rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid #F0F1F3;
+}
+
+.trend-canvas {
+  width: 100%;
+  height: 300rpx;
+  display: block;
+}
+
+.trend-caption {
+  font-size: 22rpx;
+  color: #9AA0A6;
+  text-align: center;
+  margin-top: 8rpx;
+}
+
+/* 预警 */
+.alert-item {
+  display: flex;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+.alert-item:last-child {
+  border-bottom: none;
+}
+
+.alert-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  margin-top: 14rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+.dot-high { background: #D9534F; }
+.dot-medium { background: #E8A33D; }
+
+.alert-body { flex: 1; }
+
+.alert-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  margin-bottom: 6rpx;
+}
+
+.alert-msg {
+  font-size: 26rpx;
+  color: #6B7280;
+  line-height: 1.6;
+}
+
+.alert-time {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}
+
+/* 今日用药明细 */
+.slot {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+.slot:last-child { border-bottom: none; }
+
+.slot-time {
+  width: 110rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1F2429;
+  flex-shrink: 0;
+}
+
+.slot-body { flex: 1; overflow: hidden; }
+
+.slot-name {
+  font-size: 28rpx;
+  color: #1F2429;
+  margin-bottom: 6rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-meta {
+  font-size: 22rpx;
+  color: #9AA0A6;
+}
+
+.slot-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.slot-fill {
+  font-size: 22rpx;
+  color: #2E7D6F;
+  padding: 4rpx 16rpx;
+  border: 2rpx solid #2E7D6F;
+  border-radius: 100rpx;
+}
+
+/* 错误状态 */
+.err-msg {
+  color: #D9534F;
+  font-size: 26rpx;
+  word-break: break-all;
+  margin-bottom: 24rpx;
+}
+
+.err-hint {
+  text-align: left;
+  font-size: 24rpx;
+  color: #9AA0A6;
+  line-height: 1.9;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+  padding: 24rpx;
+}
+
+/* 设备状态 */
+.device-row {
+  display: flex;
+  align-items: center;
+  padding: 18rpx 0;
+}
+
+.device-status-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+.dot-online { background: #2E7D6F; }
+.dot-offline { background: #C4C9CF; }
+
+.device-name {
+  flex: 1;
+  font-size: 28rpx;
+}

@@ -1,0 +1,35 @@
+# 智药云联 · 硬件端依赖
+#
+# ⚠️ 这套代码尽量只用标准库，所以没有 pip 依赖清单。
+#    在 ARM 架构上 pip 经常没有预编译包，会现场编译几十分钟还容易失败。
+#    用 apt 装 Debian 打包好的 aarch64 版本，几秒钟就好。
+#
+# 一次性装齐：
+#
+#   sudo apt update && sudo apt install -y \
+#       python3-opencv \
+#       python3-numpy \
+#       gpiod \
+#       python3-libgpiod \
+#       espeak-ng \
+#       alsa-utils \
+#       v4l-utils
+#
+# 各包的用途：
+#   python3-opencv      药片计数、摄像头取图
+#   python3-numpy       OpenCV 的依赖，做矩阵运算
+#   gpiod               命令行工具，gpiodetect / gpioinfo，用来查引脚编号
+#   python3-libgpiod    Python 的 GPIO 接口，hal.py 用它
+#   espeak-ng           离线语音合成，播报药名
+#   alsa-utils          aplay / arecord，播放和录音
+#   v4l-utils           v4l2-ctl，查看摄像头的支持格式
+#
+# 可选：
+#   ffmpeg              如果要跑 cam.py 的 MJPEG 推流
+#
+# 检查装齐没有：
+#   python3 main.py --selftest
+#
+# 代码只用到这些 Python 标准库，不需要额外安装：
+#   os, sys, time, json, subprocess, tempfile, threading,
+#   urllib.request, datetime, argparse, contextlib

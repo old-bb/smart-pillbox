@@ -1,0 +1,263 @@
+/* 用药计划 */
+
+.plan-card.inactive {
+  opacity: 0.6;
+}
+
+.plan-head {
+  margin-bottom: 16rpx;
+}
+
+.plan-bay {
+  font-size: 22rpx;
+  color: #FFFFFF;
+  background: #2E7D6F;
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  margin-right: 14rpx;
+  flex-shrink: 0;
+}
+
+.plan-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-times {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #2E7D6F;
+  letter-spacing: 2rpx;
+  margin-bottom: 12rpx;
+}
+
+.plan-meta {
+  font-size: 24rpx;
+  color: #6B7280;
+}
+
+.plan-dot {
+  margin: 0 10rpx;
+  color: #C4C9CF;
+}
+
+.plan-stock {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.stock-tag {
+  font-size: 22rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 100rpx;
+}
+
+.restock-btn {
+  margin-left: auto;
+  font-size: 24rpx;
+  color: #2E7D6F;
+  font-weight: 500;
+  padding: 4rpx 0 4rpx 16rpx;
+}
+.stock-ok     { background: #F0F1F3; color: #6B7280; }
+.stock-medium { background: #FDF3E3; color: #C98A22; }
+.stock-high   { background: #FCEAEA; color: #D9534F; }
+.stock-none   { background: #F0F1F3; color: #9AA0A6; }
+
+.plan-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 48rpx;
+}
+
+.plan-action {
+  font-size: 26rpx;
+  color: #2E7D6F;
+}
+
+.plan-action.danger {
+  color: #D9534F;
+}
+
+/* 底部固定按钮 */
+.fab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1rpx solid #EDEFF2;
+}
+
+/* ── 编辑面板 ── */
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 88vh;
+  background: #FFFFFF;
+  border-radius: 28rpx 28rpx 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx 32rpx 16rpx;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+
+.sheet-title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.sheet-close {
+  font-size: 32rpx;
+  color: #9AA0A6;
+  padding: 0 12rpx;
+}
+
+.sheet-body {
+  flex: 1;
+  max-height: 60vh;
+  padding: 24rpx 32rpx;
+}
+
+.sheet-foot {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid #F0F1F3;
+}
+
+.sheet-foot .btn {
+  flex: 1;
+}
+
+.sheet-tip {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #6B7280;
+  line-height: 1.7;
+}
+
+/* 表单 */
+.field {
+  margin-bottom: 32rpx;
+}
+
+.field-row {
+  display: flex;
+  gap: 24rpx;
+}
+.field.half { flex: 1; }
+
+.field-label {
+  font-size: 26rpx;
+  color: #6B7280;
+  margin-bottom: 14rpx;
+}
+
+.field-input,
+.field-value {
+  height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.field-value {
+  color: #1F2429;
+}
+
+/* 药仓选择 */
+.bay-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.bay-opt {
+  width: calc((100% - 32rpx) / 3);
+  padding: 20rpx 12rpx;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+  text-align: center;
+  font-size: 26rpx;
+  border: 2rpx solid transparent;
+  box-sizing: border-box;
+}
+
+.bay-opt.active {
+  background: #E6F4F1;
+  border-color: #2E7D6F;
+  color: #2E7D6F;
+  font-weight: 600;
+}
+
+.bay-opt.disabled {
+  opacity: 0.4;
+}
+
+.bay-opt-hint {
+  font-size: 20rpx;
+  color: #9AA0A6;
+  margin-top: 4rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 时间行 */
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.time-value {
+  width: 220rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  background: #F7F8FA;
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2E7D6F;
+}
+
+.time-del {
+  font-size: 26rpx;
+  color: #D9534F;
+  padding: 0 16rpx;
+}
+
+.time-add {
+  font-size: 26rpx;
+  color: #2E7D6F;
+  padding: 16rpx 0;
+}

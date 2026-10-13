@@ -1,0 +1,9 @@
+{
+  "name": "record",
+  "version": "1.0.0",
+  "description": "服药记录查询与设备事件上报",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

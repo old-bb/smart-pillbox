@@ -1,0 +1,9 @@
+{
+  "name": "analytics",
+  "version": "1.0.0",
+  "description": "依从性评分、库存预警、提醒管理",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

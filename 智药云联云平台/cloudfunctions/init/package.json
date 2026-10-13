@@ -1,0 +1,9 @@
+{
+  "name": "init",
+  "version": "1.0.0",
+  "description": "数据库集合初始化",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

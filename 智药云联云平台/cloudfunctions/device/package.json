@@ -1,0 +1,9 @@
+{
+  "name": "device",
+  "version": "1.0.0",
+  "description": "药盒设备绑定与管理",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

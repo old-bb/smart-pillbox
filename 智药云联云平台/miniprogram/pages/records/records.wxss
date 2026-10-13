@@ -1,0 +1,140 @@
+/* 服药记录 */
+
+.adh-row {
+  display: flex;
+  align-items: center;
+}
+
+.adh-score {
+  display: flex;
+  align-items: baseline;
+  margin-right: 48rpx;
+}
+
+.adh-stats {
+  display: flex;
+  gap: 40rpx;
+}
+
+.adh-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.adh-num {
+  font-size: 36rpx;
+  font-weight: 600;
+}
+
+/* 逐药品条 */
+.med-row {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 0;
+}
+
+.med-name {
+  width: 180rpx;
+  font-size: 26rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.med-bar {
+  flex: 1;
+  height: 12rpx;
+  background: #EDEFF2;
+  border-radius: 100rpx;
+  overflow: hidden;
+  margin: 0 16rpx;
+}
+
+.med-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4A9D8E, #2E7D6F);
+  border-radius: 100rpx;
+}
+
+.med-score {
+  width: 80rpx;
+  text-align: right;
+  font-size: 24rpx;
+  color: #6B7280;
+  flex-shrink: 0;
+}
+
+/* 筛选栏 */
+.filter-bar {
+  display: flex;
+  padding: 24rpx 24rpx 0;
+  gap: 16rpx;
+}
+
+.filter-item {
+  padding: 10rpx 32rpx;
+  background: #FFFFFF;
+  border-radius: 100rpx;
+  font-size: 26rpx;
+  color: #6B7280;
+}
+
+.filter-item.active {
+  background: #2E7D6F;
+  color: #FFFFFF;
+  font-weight: 500;
+}
+
+/* 记录条目 */
+.rec {
+  display: flex;
+  align-items: center;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid #F0F1F3;
+}
+.rec:last-child { border-bottom: none; }
+
+.rec-left {
+  width: 130rpx;
+  flex-shrink: 0;
+}
+
+.rec-time {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.rec-actual {
+  font-size: 20rpx;
+  color: #9AA0A6;
+  margin-top: 4rpx;
+}
+
+.rec-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.rec-name {
+  font-size: 28rpx;
+  margin-bottom: 6rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-meta {
+  font-size: 22rpx;
+  color: #9AA0A6;
+  line-height: 1.6;
+}
+
+.load-more {
+  text-align: center;
+  padding: 32rpx;
+  font-size: 24rpx;
+  color: #9AA0A6;
+}
