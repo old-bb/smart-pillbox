@@ -314,6 +314,55 @@ async function main() {
   const created = stub.__store.plans.find(p => p.bayIndex === 1)
   check('  每日消耗自动算出 = 2×3 = 6', created.dailyConsumption, 6)
 
+  section('十、设备心跳（回归测试）')
+
+  // 硬件端通过 HTTP 触发调用 device 云函数，设备没有 OPENID。
+  // 曾经的问题：登录校验排在 switch 之前，导致心跳恒返回 401，
+  // 设备 lastSeenAt 永不更新，小程序里药盒一直显示「离线」。
+  const deviceFn = require('../cloudfunctions/device/index.js')
+
+  seedBase()
+  stub.__setOpenid('')                    // 模拟 HTTP 触发：无微信身份
+  stub.__store.devices[0].lastSeenAt = null
+  stub.__store.devices[0].online = false
+
+  r = await deviceFn.main({ action: 'heartbeat', deviceId: 'BOX001', token: TOKEN, battery: 77 })
+  check('硬件端无 OPENID 也能上报心跳', r.code, 0)
+  check('  心跳更新了 lastSeenAt', stub.__store.devices[0].lastSeenAt !== null, true)
+  check('  心跳更新了 online 标志', stub.__store.devices[0].online, true)
+  check('  心跳更新了电量', stub.__store.devices[0].battery, 77)
+
+  // 鉴权：token 错误必须被拒，且不得改动设备状态
+  seedBase()
+  stub.__setOpenid('')
+  stub.__store.devices[0].lastSeenAt = null
+  r = await quiet(() => deviceFn.main({ action: 'heartbeat', deviceId: 'BOX001', token: 'wrong-token' }))
+  check('错误 token 被拒绝', r.code, 403)
+  check('  被拒后 lastSeenAt 未被改动', stub.__store.devices[0].lastSeenAt, null)
+
+  // 未注册设备
+  seedBase()
+  stub.__setOpenid('')
+  r = await quiet(() => deviceFn.main({ action: 'heartbeat', deviceId: 'NOT-EXIST', token: TOKEN }))
+  check('未注册设备被拒绝', r.code, 404)
+
+  // 缺少 deviceId
+  seedBase()
+  stub.__setOpenid('')
+  r = await deviceFn.main({ action: 'heartbeat', token: TOKEN })
+  check('缺少 deviceId 被拒绝', r.code, 400)
+
+  // 小程序端的登录校验不能被破坏
+  seedBase()
+  stub.__setOpenid('')
+  r = await quiet(() => deviceFn.main({ action: 'list' }))
+  check('未登录调用 list 仍被拒绝', r.code, 401)
+
+  seedBase()
+  stub.__setOpenid(OPENID)
+  r = await deviceFn.main({ action: 'list' })
+  check('已登录调用 list 正常', r.code, 0)
+
   // ── 汇总 ──
   console.log('\n' + '─'.repeat(50))
   console.log(`通过 ${pass} 项，失败 ${fail} 项`)

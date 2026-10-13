@@ -226,7 +226,7 @@ node tests/run.js
 # 硬件端调度状态机（20 项：时点展开、播报文案、开盖/按键/超时三条确认路径）
 cd 硬件端 && python3 test_logic.py
 
-# 云函数业务逻辑（40 项：时区判定、依从性计分、库存扣减幂等、越权拦截等）
+# 云函数业务逻辑（50 项：时区判定、依从性计分、库存扣减幂等、越权拦截、设备心跳等）
 cd 智药云联云平台 && node tests/run.js
 ```
 
@@ -437,7 +437,7 @@ $ cd 硬件端 && python3 test_logic.py
 全部通过 ✓
 
 $ cd 智药云联云平台 && node tests/run.js
-通过 40 项，失败 0 项
+通过 50 项，失败 0 项
 全部通过 ✓
 ```
 
@@ -447,32 +447,36 @@ $ cd 智药云联云平台 && node tests/run.js
 
 以下问题在**阅读源码并实际运行验证**后确认，请勿在部署时踩坑：
 
-### 6.1 设备心跳必然失败（`cloudfunctions/device/index.js`）
+### 6.1 已修复：设备心跳曾因登录校验位置错误而恒返回 401
 
-`device` 云函数在进入 `switch` **之前**就做了登录校验：
+**（本节记录一个已修复的真实缺陷，保留原因见文末。）**
+
+`device` 云函数原先在进入 `switch` **之前**就做了登录校验：
 
 ```js
-if (!OPENID) return { code: 401, msg: '未登录' }   // ← 第 39 行，早于 switch
+if (!OPENID) return { code: 401, msg: '未登录' }   // ← 曾位于 switch 之前
 ```
 
 而硬件端 `scheduler.py` 每 3 分钟通过 HTTP 调用 `device` 的 `heartbeat` 动作。设备没有微信身份，`OPENID` 必然为空，因此**心跳恒定返回 401，`lastSeenAt` 永不更新**，小程序里药盒会一直显示「离线」。
 
-实测对比（用项目自带的 `tests/wx-server-sdk-stub.js` 复现）：
+`record` 与 `plan` 都把设备分支放在了登录校验**之前**，只有 `device.heartbeat` 这一条路径有问题。
 
-| 调用 | OPENID | 结果 |
-|---|---|---|
-| `device.heartbeat`（硬件端心跳） | 空 | `{"code":401,"msg":"未登录"}`，`lastSeenAt` 仍为 `null` |
-| `device.heartbeat`（小程序端调用） | 有 | `{"code":0,"data":{"deviceId":"BOX-TEST01"}}` |
-| `record.report`（硬件端上报） | 空 | `{"code":0, ...}` ✅ 正常 |
-| `plan.listForDevice`（硬件端拉计划） | 空 | `{"code":0, ...}` ✅ 正常 |
+**修复方式**：把 `heartbeat` 分支提到登录校验之前，并按 `record` / `plan` 的同样方式校验 `token`：
 
-`record` 与 `plan` 都把设备分支放在了登录校验**之前**，所以设备上报与拉计划不受影响 —— 只有 `heartbeat` 这一条路径有问题。
+```js
+if (action === 'heartbeat') {
+  return await heartbeat(event)      // 设备分支：走 token 鉴权，无需 OPENID
+}
+if (!OPENID) return { code: 401, msg: '未登录' }
+```
 
-**修复方向**：把 `heartbeat` 分支提到登录校验之前，并像 `record.report` 一样校验 `token`。
+**回归测试**：测试套件原先**完全没有覆盖 `device` 云函数**，所以 CI 拦不住这个缺陷。现已补充「十、设备心跳（回归测试）」共 10 项断言。实测该测试确实有效 —— 把修复回退后，其中 **7 项立即失败**（`期望 0，实际 401`），恢复修复后 50 项全部通过。
+
+> 保留本节的用意：它记录了一个「参数校验顺序」导致的功能缺陷，以及「测试盲区让 CI 失效」的教训。同类问题在新增云函数时仍可能出现 —— 任何由**设备**调用（而非小程序调用）的 action，都必须放在登录校验之前。
 
 ### 6.2 其它待办
 
-- **真实设备对接联调**尚未完成（云端 `record` 的 `report` 与 `plan` 的 `listForDevice` 已就绪可测）
+- **真实设备对接联调**尚未完成（云端 `record` 的 `report`、`plan` 的 `listForDevice`、`device` 的 `heartbeat` 均已就绪可测）
 - **设备鉴权是占位方案**：当前用固定 token（默认 `zhihyao-dev-token`），正式方案应为设备密钥签名验签
 - **电池电量**：`_read_battery()` 目前恒返回 `None`，云端显示「未知」（中期阶段市电供电）
 - **摄像头对焦**：桌面摄像头为定焦，设计工作距离 30cm 以上，放在药仓上方 10cm 会失焦。三个办法：换可调焦 USB 摄像头模块（约 ¥40）/ 拆开拧对焦环 / **改用称重方案**（HX711 + 称重传感器，约 ¥25）—— 对「还剩多少药」这个问题，称重比摄像头更可靠且不受光照影响
@@ -502,7 +506,7 @@ if (!OPENID) return { code: 401, msg: '未登录' }   // ← 第 39 行，早于
 │   ├── miniprogram/              小程序（5 个页面）
 │   │   ├── pages/                index / records / plans / device / profile
 │   │   └── utils/                api / chart / format / subscribe / constants
-│   └── tests/                    本地测试（40 项），含内存版云数据库替身
+│   └── tests/                    本地测试（50 项），含内存版云数据库替身
 ├── 中期检查材料/                 中期检查报告书
 ├── 结项检查材料/                 结项报告书等模板
 ├── 药盒.pptx                     演示文稿

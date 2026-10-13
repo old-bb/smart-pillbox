@@ -36,9 +36,16 @@ exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
   const { action } = event
 
-  if (!OPENID) return { code: 401, msg: '未登录' }
-
   try {
+    // 药盒设备上报心跳。走设备 token 鉴权，不需要用户登录 ——
+    // 设备没有微信身份，拿不到 OPENID，所以这一分支必须排在登录校验【之前】。
+    // （与 record.report / plan.listForDevice 的处理方式保持一致。）
+    if (action === 'heartbeat') {
+      return await heartbeat(event)
+    }
+
+    if (!OPENID) return { code: 401, msg: '未登录' }
+
     switch (action) {
       case 'list':
         return await list(OPENID)
@@ -48,8 +55,6 @@ exports.main = async (event) => {
         return await unbind(OPENID, event.id)
       case 'updateBays':
         return await updateBays(OPENID, event)
-      case 'heartbeat':
-        return await heartbeat(event)
       default:
         return { code: 400, msg: `未知 action: ${action}` }
     }
@@ -159,10 +164,23 @@ async function updateBays(openid, event) {
   return { code: 0, data: { _id: event.id } }
 }
 
-/** 设备心跳：硬件端定时上报电量与在线状态 */
+/**
+ * 设备心跳：硬件端定时上报电量与在线状态。
+ *
+ * 由药盒通过云函数 HTTP 触发调用，走 deviceId + token 鉴权（设备没有 OPENID）。
+ * 与 record.report / plan.listForDevice 使用同一个 DEVICE_TOKEN。
+ *
+ * ⚠️ token 目前是固定占位方案，正式做法是设备密钥签名，见 record 云函数的说明。
+ */
 async function heartbeat(event) {
-  const { deviceId, battery, firmware } = event
+  const { deviceId, battery, firmware, token } = event
   if (!deviceId) return { code: 400, msg: '缺少 deviceId' }
+
+  const EXPECTED = process.env.DEVICE_TOKEN || 'zhihyao-dev-token'
+  if (token !== EXPECTED) {
+    console.warn('[device] 设备鉴权失败', deviceId)
+    return { code: 403, msg: '设备鉴权失败' }
+  }
 
   const found = await db.collection('devices').where({ deviceId }).limit(1).get()
   if (found.data.length === 0) return { code: 404, msg: '设备未注册' }
