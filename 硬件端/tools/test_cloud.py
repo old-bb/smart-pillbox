@@ -33,26 +33,37 @@ def check_config():
     print(f'    设备 ID     {config.DEVICE_ID}')
     print(f'    小程序      {config.WX_APPID or "（空）"}')
     print(f'    云环境      {config.CLOUD_ENV or "（空）"}')
+
+    # 逐项报告 —— 只说「还没配置」没用，得说清缺哪一个。
+    # 两个凭证是独立的：缺 AppSecret 是取不到令牌，
+    # 缺设备令牌是云端会拒绝设备请求，故障现象完全不同。
+    has_secret = bool(config.WX_APPSECRET)
+    has_token = bool(config.DEVICE_TOKEN)
+    print(f'    AppSecret   {"已配置" if has_secret else "缺失 ✗"}')
+    print(f'    设备令牌    {"已配置" if has_token else "缺失 ✗"}')
     print(f'    传输方式    {cloud.transport_name()}')
 
-    if not cloud.is_configured():
-        print(f'\n  {BAD} 还没配置。两种方式任选一种：')
-        print()
-        print('  【方式一·推荐】服务端 API —— 免费、免网关、免备案')
-        print('      在本目录下建 secret.json，内容：')
-        print('          {"appsecret": "你的小程序AppSecret"}')
-        print('      AppSecret 在 小程序后台 → 开发管理 → 开发设置')
-        print()
-        print('  【方式二】HTTP 访问服务 —— 需要环境的 HTTP 网关已配好')
-        print('      在 config.py 里填 CLOUD_BASE_URL')
-        return False
+    if cloud.is_configured():
+        return True
 
-    if not config.WX_APPSECRET and not config.CLOUD_BASE_URL:
-        print(f'\n  {BAD} 选了服务端 API 但没填 AppSecret')
-        print('      建一个 secret.json：{"appsecret": "xxx"}')
-        return False
+    print(f'\n  {BAD} 还差这些：')
+    if not has_secret and not config.CLOUD_BASE_URL:
+        print('      · AppSecret')
+        print('        小程序后台 → 开发管理 → 开发设置 → 复制 AppSecret')
+        print('        填到本目录 secret.json 的 "appsecret"')
+    if not has_token:
+        print('      · 设备令牌')
+        print('        云开发控制台 → record / device / plan 三个云函数')
+        print('        → 版本详情 → 配置 → 环境变量 → 加 DEVICE_TOKEN')
+        print('        → 三个都要重新「上传并部署」才生效')
+        print('        同一个值填到本目录 secret.json 的 "devicetoken"')
 
-    return True
+    print('\n  本目录下的 secret.json 应该长这样（两项都要有）：')
+    print('      {')
+    print('        "appsecret":   "小程序后台复制的那串",')
+    print('        "devicetoken": "云函数环境变量 DEVICE_TOKEN 的同款值"')
+    print('      }')
+    return False
 
 
 def check_token():
@@ -64,7 +75,9 @@ def check_token():
     print(f'\n[{OK}] 取 access_token（服务端 API 的第一步）')
     try:
         tok = cloud._get_access_token(force=True)
-        print(f'  {OK} 拿到了，前 8 位 {tok[:8]}…')
+        # 不打印令牌内容，哪怕是一部分 —— 凭证一旦进了终端和日志，
+        # 就多了一处需要清理的地方。长度足够说明取到了。
+        print(f'  {OK} 拿到了（{len(tok)} 字符，有效期 2 小时）')
         return True
     except Exception as e:
         print(f'  {BAD} 失败：{e}')

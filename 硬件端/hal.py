@@ -298,40 +298,48 @@ class _GpioBackend:
         except ImportError:
             gpiod = None
 
-        # sysfs 模式和 gpiod 模式的【编号空间不同】，必须换算：
-        #   gpiod 用「芯片 + 线号」      gpiochip0 line 17
-        #   sysfs 用「全局 GPIO 号」     gpio17（全局号 = 芯片基址 + 线号）
-        # 板子上通常有两块芯片（比如基址 0 和 352），
-        # 第二块上的 line 5 在 sysfs 里是 357 —— 直接按 5 去找会找错引脚。
-        self._sysfs_base = 0
+        # ── 芯片布局 ──────────────────────────────────────────
+        #
+        # config.py 里的引脚编号统一用【全局 GPIO 号】——
+        # 就是官方 40-pin 表格里那一列（比如 PB3 = 35、PL4 = 356），
+        # 也正好是 sysfs 用的编号。这样两边的数对得上，不用心算换算。
+        #
+        # ⚠️ 但**40-pin 的引脚横跨两块芯片**：
+        #       PB3 = 35  → gpiochip0（基址 0）
+        #       PL4 = 356 → gpiochip1（基址 352）
+        #   所以不能假设"所有引脚在同一块芯片上"，否则 PL4 会被算成
+        #   gpiochip0 的 line 4，操作到完全无关的引脚上去。
+        self._chips = self._list_sysfs_chips()
+        self._chip_lines = self._read_chip_lines()
 
         if self.mode is None:
-            chips = self._list_sysfs_chips()
-            if chips:
+            if self._chips:
                 self.mode = 'sysfs'
-                idx = min(getattr(config, 'GPIO_CHIP_INDEX', 0), len(chips) - 1)
-                self._sysfs_base = chips[idx][1]
                 print('[GPIO] libgpiod 的 Python 绑定不可用，退回 sysfs')
-                print(f'       板上有 {len(chips)} 块芯片：'
-                      + '、'.join(f'{n}(基址 {b})' for n, b in chips))
-                print(f'       使用第 {idx} 块，基址 {self._sysfs_base}，'
-                      f'配置里的 line N 会换算成 gpio{self._sysfs_base}+N')
-                if self._sysfs_base:
-                    print('       ⚠️ 基址不是 0，确认 config.py 的 GPIO_CHIP_INDEX 选对了芯片')
+                print('       板上有 ' + str(len(self._chips)) + ' 块芯片：'
+                      + '、'.join(f'{n}(基址 {b}, {self._chip_lines.get(n, "?")} 线)'
+                                  for n, b in self._chips))
+                print('       sysfs 直接用全局 GPIO 号，无需换算')
             else:
                 raise RuntimeError(
                     '找不到任何 GPIO 接口。\n'
                     '尝试安装：sudo apt install -y python3-libgpiod\n'
                     '或者先用模拟模式跑：ZHIHYAO_MOCK=1 python3 main.py'
                 )
+        else:
+            if self._chips:
+                print('[GPIO] 使用 libgpiod ' + self.mode)
+                print('       板上有 ' + str(len(self._chips)) + ' 块芯片：'
+                      + '、'.join(f'{n}(基址 {b})' for n, b in self._chips))
 
-        # gpiod 模式下的芯片设备路径
-        self._chip_path = '/dev/gpiochip0'
+        # gpiod 模式下的芯片设备路径列表（按基址排序）
+        self._chip_paths = []
         for i in range(8):
             p = f'/dev/gpiochip{i}'
             if os.path.exists(p):
-                self._chip_path = p
-                break
+                self._chip_paths.append(p)
+        if not self._chip_paths:
+            self._chip_paths = ['/dev/gpiochip0']
 
     @staticmethod
     def _list_sysfs_chips():
@@ -356,30 +364,83 @@ class _GpioBackend:
             return []
         return sorted(chips, key=lambda x: x[1])
 
+    def _read_chip_lines(self):
+        """读每块芯片有多少条线，用来判断某个全局号落在哪一块上"""
+        counts = {}
+        for name, _ in self._chips:
+            try:
+                with open(f'/sys/class/gpio/{name}/ngpio') as f:
+                    counts[name] = int(f.read().strip())
+            except (OSError, ValueError):
+                counts[name] = 0
+        return counts
+
+    def _locate(self, gpio):
+        """
+        全局 GPIO 号 → (芯片序号, 芯片内的 line 偏移)，找不到返回 (None, None)。
+
+        gpiod 的 API 要的是「芯片 + 线号」，所以必须知道引脚在哪块芯片上。
+        """
+        for i, (name, base) in enumerate(self._chips):
+            n = self._chip_lines.get(name, 0)
+            if base <= gpio < base + n:
+                return i, gpio - base
+        return None, None
+
+    def _say_unknown(self, gpio):
+        print(f'[GPIO] 全局号 {gpio} 不在任何已知芯片上 —— 检查 config.py 的引脚编号')
+
     def _sysfs_global(self, pin):
-        """把 config 里的 line number 换算成 sysfs 的全局 GPIO 号"""
-        return self._sysfs_base + pin
+        """
+        配置里的编号已经是全局 GPIO 号了，sysfs 直接用，不用换算。
+
+        （这里保留成方法是为了让调用点统一，将来若要支持别的编号方案好改。）
+        """
+        return pin
 
     # ── 输出 ──
+
+    def _group_by_chip(self, pins):
+        """
+        把全局 GPIO 号按所属芯片分组，返回 [(芯片序号, [(全局号, 片内偏移), ...]), ...]
+
+        gpiod 的 request_lines 一次只能针对一块芯片，而 40-pin 的引脚
+        横跨两块，所以必须分组后分别请求。
+        """
+        groups = {}
+        for pin in pins:
+            idx, off = self._locate(pin)
+            if idx is None:
+                self._say_unknown(pin)
+                continue
+            groups.setdefault(idx, []).append((pin, off))
+        return sorted(groups.items())
 
     def setup_outputs(self, pins):
         self._out_pins = list(pins)
         if self.mode == 'gpiod-v2':
             g = self._gpiod
             from gpiod.line import Direction, Value
-            cfg = {
-                p: g.LineSettings(direction=Direction.OUTPUT, output_value=Value.INACTIVE)
-                for p in self._out_pins
-            }
-            self._out_req = g.request_lines(self._chip_path, consumer='zhihyao-out', config=cfg)
+            self._out_req = {}
+            for idx, entries in self._group_by_chip(self._out_pins):
+                cfg = {
+                    off: g.LineSettings(direction=Direction.OUTPUT,
+                                        output_value=Value.INACTIVE)
+                    for _, off in entries
+                }
+                self._out_req[idx] = g.request_lines(
+                    self._chip_paths[idx], consumer='zhihyao-out', config=cfg)
         elif self.mode == 'gpiod-v1':
             self._out_req = {}
-            chip = self._gpiod.Chip(self._chip_path)
-            for p in self._out_pins:
-                line = chip.get_line(p)
-                line.request(consumer='zhihyao-out', type=self._gpiod.LINE_REQ_DIR_OUT)
-                self._out_req[p] = line
-        else:  # sysfs —— 注意下面的编号要换算成全局 GPIO 号
+            # v1 的 Chip 每次都要按路径打开，所以也按芯片分组
+            chips = {}
+            for idx, entries in self._group_by_chip(self._out_pins):
+                chip = chips.setdefault(idx, self._gpiod.Chip(self._chip_paths[idx]))
+                for pin, off in entries:
+                    line = chip.get_line(off)
+                    line.request(consumer='zhihyao-out', type=self._gpiod.LINE_REQ_DIR_OUT)
+                    self._out_req[pin] = line
+        else:  # sysfs —— 直接用全局号
             for p in self._out_pins:
                 g = self._sysfs_global(p)
                 self._sysfs_export(g)
@@ -388,9 +449,15 @@ class _GpioBackend:
     def write(self, pin, on):
         if self.mode == 'gpiod-v2':
             from gpiod.line import Value
-            self._out_req.set_value(pin, Value.ACTIVE if on else Value.INACTIVE)
+            idx, off = self._locate(pin)
+            req = self._out_req.get(idx)
+            if req is None:
+                return
+            req.set_value(off, Value.ACTIVE if on else Value.INACTIVE)
         elif self.mode == 'gpiod-v1':
-            self._out_req[pin].set_value(1 if on else 0)
+            line = self._out_req.get(pin)
+            if line is not None:
+                line.set_value(1 if on else 0)
         else:
             self._sysfs_set(self._sysfs_global(pin), '1' if on else '0')
 
@@ -402,20 +469,25 @@ class _GpioBackend:
             g = self._gpiod
             from gpiod.line import Direction, Bias
             bias = Bias.PULL_UP if pull_up else Bias.AS_IS
-            cfg = {
-                p: g.LineSettings(direction=Direction.INPUT, bias=bias)
-                for p in self._in_pins
-            }
-            self._in_req = g.request_lines(self._chip_path, consumer='zhihyao-in', config=cfg)
+            self._in_req = {}
+            for idx, entries in self._group_by_chip(self._in_pins):
+                cfg = {
+                    off: g.LineSettings(direction=Direction.INPUT, bias=bias)
+                    for _, off in entries
+                }
+                self._in_req[idx] = g.request_lines(
+                    self._chip_paths[idx], consumer='zhihyao-in', config=cfg)
         elif self.mode == 'gpiod-v1':
             self._in_req = {}
-            chip = self._gpiod.Chip(self._chip_path)
-            for p in self._in_pins:
-                line = chip.get_line(p)
-                flags = self._gpiod.LINE_REQ_FLAG_BIAS_PULL_UP if pull_up else 0
-                line.request(consumer='zhihyao-in',
-                             type=self._gpiod.LINE_REQ_DIR_IN, flags=flags)
-                self._in_req[p] = line
+            chips = {}
+            for idx, entries in self._group_by_chip(self._in_pins):
+                chip = chips.setdefault(idx, self._gpiod.Chip(self._chip_paths[idx]))
+                for pin, off in entries:
+                    line = chip.get_line(off)
+                    flags = self._gpiod.LINE_REQ_FLAG_BIAS_PULL_UP if pull_up else 0
+                    line.request(consumer='zhihyao-in',
+                                 type=self._gpiod.LINE_REQ_DIR_IN, flags=flags)
+                    self._in_req[pin] = line
         else:
             for p in self._in_pins:
                 g = self._sysfs_global(p)
@@ -435,9 +507,16 @@ class _GpioBackend:
         try:
             if self.mode == 'gpiod-v2':
                 from gpiod.line import Value
-                return self._in_req.get_value(pin) == Value.ACTIVE
+                idx, off = self._locate(pin)
+                req = self._in_req.get(idx)
+                if req is None:
+                    return None
+                return req.get_value(off) == Value.ACTIVE
             elif self.mode == 'gpiod-v1':
-                return bool(self._in_req[pin].get_value())
+                line = self._in_req.get(pin)
+                if line is None:
+                    return None
+                return bool(line.get_value())
             else:
                 g = self._sysfs_global(pin)
                 with open(f'/sys/class/gpio/gpio{g}/value') as f:
