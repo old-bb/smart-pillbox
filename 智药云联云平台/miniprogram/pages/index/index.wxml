@@ -15,7 +15,7 @@
         <view>1. miniprogram/app.js 里的 env 是否填了云开发环境 ID</view>
         <view>2. 云函数是否已经上传部署（8 个）</view>
       </view>
-      <button class="btn btn-primary" bindtap="onRetry" style="margin-top:40rpx">重试</button>
+      <button class="btn btn-primary" bindtap="onRetry" style="margin-top:40rpx;">重试</button>
     </view>
   </view>
 
@@ -26,7 +26,7 @@
         <view class="empty-title">还没有绑定药盒</view>
         <view class="empty-desc">绑定后即可在这里看到父母的服药情况</view>
         <view class="empty-desc">绑定码在药盒机身底部</view>
-        <button class="btn btn-primary mt" bindtap="goDevice" style="margin-top:40rpx">去绑定药盒</button>
+        <button class="btn btn-primary mt" bindtap="goDevice" style="margin-top:40rpx;">去绑定药盒</button>
       </view>
     </view>
   </block>
@@ -45,7 +45,7 @@
         <view class="hero-label">今日已完成</view>
       </view>
       <view class="progress-track hero-progress">
-        <view class="progress-fill" style="width:{{progress}}%"></view>
+        <view class="progress-fill" style="width:{{progress}}%;"></view>
       </view>
 
       <!-- 下次服药 -->
@@ -68,9 +68,9 @@
       </view>
       <view class="row-between">
         <view class="row">
-          <text class="score-num" style="color:{{adherenceLevel.color}}">{{adherence.score}}</text>
+          <text class="score-num" style="color:{{adherenceLevel.color}};">{{adherence.score}}</text>
           <view class="score-right">
-            <view class="tag" style="background:{{adherenceLevel.color}}1A;color:{{adherenceLevel.color}}">
+            <view class="tag" style="background:{{adherenceLevel.color}}1A;color:{{adherenceLevel.color}};">
               {{adherenceLevel.label}}
             </view>
             <view class="text-muted score-sub">共 {{adherence.total}} 次用药</view>
@@ -103,7 +103,7 @@
           <view class="text-muted alert-time">{{item.timeText}}</view>
         </view>
       </view>
-      <button class="btn btn-ghost" bindtap="goRecords" style="margin-top:16rpx">查看全部记录</button>
+      <button class="btn btn-ghost" bindtap="goRecords" style="margin-top:16rpx;">查看全部记录</button>
     </view>
 
     <!-- 今日用药明细 -->
@@ -113,9 +113,9 @@
         <text class="more" bindtap="goPlans">管理计划 ›</text>
       </view>
 
-      <view wx:if="{{slots.length === 0}}" class="empty" style="padding:60rpx 0">
+      <view wx:if="{{slots.length === 0}}" class="empty" style="padding:60rpx 0;">
         <view class="empty-desc">今天没有用药计划</view>
-        <button class="btn btn-ghost" bindtap="goPlans" style="margin-top:24rpx">去添加计划</button>
+        <button class="btn btn-ghost" bindtap="goPlans" style="margin-top:24rpx;">去添加计划</button>
       </view>
 
       <view wx:for="{{slots}}" wx:key="key" class="slot">
@@ -155,7 +155,7 @@
       </view>
     </view>
 
-    <view style="height:40rpx"></view>
+    <view style="height:40rpx;"></view>
   </block>
 
 </view>

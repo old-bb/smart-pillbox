@@ -57,6 +57,15 @@ App({
 
   /** 页面里用：确保登录完成后再发请求 */
   ready() {
-    return this.loginPromise || (this.loginPromise = this.login())
+    // 失败时必须把缓存的 promise 清掉。
+    // 否则它是一个 rejected promise —— 真值，短路逻辑永远返回它，
+    // 之后所有页面的「重试」和下拉刷新都会立刻失败，只能重启小程序。
+    if (!this.loginPromise) {
+      this.loginPromise = this.login().catch(err => {
+        this.loginPromise = null
+        throw err
+      })
+    }
+    return this.loginPromise
   }
 })

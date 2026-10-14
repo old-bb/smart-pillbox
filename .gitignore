@@ -55,9 +55,28 @@ env/
 htmlcov/
 
 # 硬件端运行时产物（不入库）
-pending.json          # 断网重传队列：运行中产生，含未上报的服药记录
-debug_shots/          # 视觉调参产生的调试图像
-voices/               # 预录语音文件（体积大，各人自行录制）
+#
+# ⚠️ 注释必须单独占一行。gitignore 不支持行尾注释 ——
+# 写成「pattern  # 说明」的话，整行会被当成模式的一部分，
+# 规则静默失效。这三条以前就是这么废掉的。
+
+# 断网重传队列：含未上报的服药记录
+pending.json
+
+# 放弃补发的记录（人工核对用）
+pending_lost.json
+
+# 损坏的队列备份
+*.bad
+
+# 测试用的临时队列（含服药事件 payload）
+test_pending*.json
+
+# 视觉调参产生的调试图像
+debug_shots/
+
+# 预录语音文件（体积大，各人自行录制）
+voices/
 
 # 允许把 voices 目录本身留在仓库里（放个说明文件即可）
 !voices/.gitkeep
@@ -110,3 +129,26 @@ push.cmd
 *.pem
 id_rsa*
 id_ed25519*
+
+# ══════════════════════════════════════════════════════════════
+#  硬件端 · 设备凭证（绝不能提交）
+# ══════════════════════════════════════════════════════════════
+#
+# secret.json 里存的是小程序 AppSecret ——
+# 它是这个 AppID 的最高权限钥匙，泄露等于整个云开发环境被交出。
+# 具体填法见 硬件端/config.py 的「云端对接」一节。
+硬件端/secret.json
+secret.json
+
+# 断网期间的待发记录（运行时产物，含服药数据）
+硬件端/pending.json
+硬件端/token.json
+
+# 硬件端调试产物
+硬件端/debug_shots/
+硬件端/__pycache__/
+硬件端/tools/__pycache__/
+
+# 调研/审查工作流产生的临时文件
+.research_tmp/
+*_plan_extract.txt

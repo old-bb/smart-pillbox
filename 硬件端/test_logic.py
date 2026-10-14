@@ -186,6 +186,148 @@ def main():
     sch._check_due(datetime.now(BJ))
     check('不会同时启动第二个提醒', sch.active is first, True)
 
+    # ══════════════════════════════════════════════════════
+    #  以下是回归测试：每条都对应一个真实出现过的缺陷
+    # ══════════════════════════════════════════════════════
+
+    section('八、迟到仍要提醒（回归）')
+
+    # 背景：触发窗口原先只有 [到点前 2 秒, 到点后 5 秒]。
+    # 主循环里任何阻塞（网络请求、语音合成）都会让时点越过这 5 秒，
+    # 于是它永远不提醒、也不上报，120 秒后被静默标记成已处理。
+
+    hw, sch = make_scheduler([make_plan(0, ['08:00'])], today)
+    slot = list(sch._slots.values())[0]
+    late_now = slot.scheduled_at + timedelta(seconds=60)   # 迟了 60 秒
+    sch._check_due(late_now)
+    check('迟到 60 秒仍然启动提醒', sch.active is slot, True)
+
+    hw, sch = make_scheduler([make_plan(0, ['08:00'])], today)
+    slot = list(sch._slots.values())[0]
+    too_late = slot.scheduled_at + timedelta(seconds=config.REMIND_TIMEOUT + 30)
+    sch._check_due(too_late)
+    check('错过太久则不再补提醒', sch.active, None)
+    check('  且被标记为已处理', slot.key in sch._done, True)
+
+    section('九、同一分钟两个药仓（回归）')
+
+    hw, sch = make_scheduler([make_plan(0, ['08:00']), make_plan(1, ['08:00'])], today)
+    first = min(sch._slots.values(), key=lambda s: s.bay)
+    t0 = first.scheduled_at
+
+    sch._check_due(t0)
+    check('第一个药仓先提醒', sch.active is not None and sch.active.bay == 0, True)
+
+    hw.simulate_button()
+    sch._service_active(t0)
+
+    # 第一个结束后，第二个已经迟到几十秒，但仍必须提醒
+    sch._check_due(t0 + timedelta(seconds=30))
+    check('第二个药仓不会因为迟到被跳过',
+          sch.active is not None and sch.active.bay == 1, True)
+
+    section('十、计划当天变更生效（回归）')
+
+    hw, sch = make_scheduler([make_plan(0, ['08:00'])], today)
+    check('初始 1 个时点', len(sch._slots), 1)
+
+    # 原先只在跨天时重建时点表，当天在云端改的计划要到第二天才生效 ——
+    # 药盒会继续按旧时间播报旧药名
+    sch.plans = [make_plan(0, ['09:30'])]
+    sch._rebuild_slots(today)
+    check('重建后出现新的 09:30 时点',
+          f'plan0_{today}_09:30' in sch._slots, True)
+    check('  旧的 08:00 时点已移除',
+          f'plan0_{today}_08:00' in sch._slots, False)
+
+    # 已完成的时点不应该因为重建而复活
+    hw, sch = make_scheduler([make_plan(0, ['08:00'])], today)
+    slot = list(sch._slots.values())[0]
+    sch._done.add(slot.key)
+    sch._rebuild_slots(today)
+    check('重建不会让已处理的时点复活', slot.key in sch._slots, False)
+
+    # 正在提醒中的时点要保留，否则会被凭空抹掉
+    hw, sch = make_scheduler([make_plan(0, ['08:00'])], today)
+    slot = list(sch._slots.values())[0]
+    sch._start_reminder(slot)
+    sch._rebuild_slots(today)
+    check('重建保留正在提醒的时点', slot.key in sch._slots, True)
+
+    section('十一、忘记合盖不判漏服（回归）')
+
+    # 背景：原先只在「盖子合上」的那一刻才算取药。
+    # 但很多老人拿完药不关盖（或者虚掩着），那样会在 120 秒后被判漏服 ——
+    # 明明吃了却告诉子女「没吃」，比漏报还糟。
+
+    import cloud
+    from scheduler import Slot
+
+    recorded = []
+    orig_report = cloud.report_event
+    cloud.report_event = lambda bay, et, ts=None: recorded.append((bay, et))
+
+    try:
+        hw, sch = make_scheduler([make_plan(0, ['08:00'])], today)
+        slot = list(sch._slots.values())[0]
+        sch._start_reminder(slot)
+
+        hw.simulate_lid(0, True)
+        sch._service_active(datetime.now(BJ))
+        check('开盖后仍在提醒中', sch.active is not None, True)
+
+        # 一直不合盖，推到超时之后
+        sch._active_since = time.time() - config.REMIND_TIMEOUT - 5
+        sch._service_active(datetime.now(BJ))
+        check('超过时限但盖子还开着 → 不判漏服', sch.active is None, True)
+        check('  上报的是已取药，不是漏服',
+              recorded and recorded[-1][1] == 'taken', True)
+    finally:
+        cloud.report_event = orig_report
+
+    section('十二、上报异常不卡死调度器（回归）')
+
+    # 背景：原先 _confirm / _missed 中途抛异常时 self.active 不会被清空，
+    # 之后 _check_due 每次都提前返回 —— 调度器彻底卡死，
+    # 所有时点都不再提醒。药盒是无人值守设备，这个错误不可接受。
+
+    hw, sch = make_scheduler([make_plan(0, ['08:00'])], today)
+    slot0 = list(sch._slots.values())[0]
+    sch._start_reminder(slot0)
+
+    def boom(*a, **k):
+        raise RuntimeError('模拟上报失败')
+
+    cloud.report_event = boom
+    try:
+        hw.simulate_button()
+        try:
+            sch._service_active(datetime.now(BJ))
+        except RuntimeError:
+            pass   # 异常会向上抛给主循环记录日志，这是预期行为
+    finally:
+        cloud.report_event = orig_report
+
+    check('上报抛异常后 active 已被清空', sch.active, None)
+    check('  该时点已标记完成', slot0.key in sch._done, True)
+    # 关键：后续时点还能正常提醒
+    hw2, sch2 = make_scheduler([make_plan(1, ['09:00'])], today)
+    s2 = list(sch2._slots.values())[0]
+    sch2._start_reminder(s2)
+    check('  调度器没有卡死，能继续提醒', sch2.active is s2, True)
+
+    section('十三、计划变化检测')
+
+    from scheduler import Scheduler
+
+    d1 = Scheduler._plans_digest([make_plan(0, ['08:00'])])
+    d2 = Scheduler._plans_digest([make_plan(0, ['09:00'])])
+    d3 = Scheduler._plans_digest([make_plan(0, ['08:00'])])
+    check('时间变化能检出', d1 != d2, True)
+    check('药名变化能检出',
+          d1 != Scheduler._plans_digest([make_plan(0, ['08:00'], '别的药')]), True)
+    check('没变化时摘要相同', d1 == d3, True)
+
     # ─────────────────────────────────────────────────────
     print('\n' + '─' * 52)
     print(f'通过 {PASS} 项，失败 {FAIL} 项')

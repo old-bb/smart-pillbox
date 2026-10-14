@@ -27,6 +27,20 @@ import config   # noqa: E402
 def cmd_list():
     print('当前系统上的 GPIO 控制器：\n')
     os.system('gpiodetect 2>/dev/null || echo "  没找到 gpiodetect，装一下：sudo apt install -y gpiod"')
+
+    # sysfs 模式下编号要换算：全局号 = 芯片基址 + line
+    from hal import _GpioBackend
+    chips = _GpioBackend._list_sysfs_chips()
+    if chips:
+        print('\nsysfs 芯片与基址（config.py 的 GPIO_CHIP_INDEX 指的 就是这里的序号）：\n')
+        for i, (name, base) in enumerate(chips):
+            print(f'    [{i}] {name:16s} 基址 {base}')
+        print('\n  如果你的引脚在 [1] 上，那config.py 里填的 line 5：')
+        print(f'    · 用 gpiod 时 → gpiochip 第 2 块的 line 5')
+        print(f'    · 退到 sysfs 时 → 全局 gpio{chips[1][1] + 5}（程序会自动算）')
+    else:
+        print('\n  没有 /sys/class/gpio，sysfs 不可用')
+
     print('\n全部引脚的当前状态（第一列就是 line number）：\n')
     os.system('gpioinfo 2>/dev/null | head -60')
 

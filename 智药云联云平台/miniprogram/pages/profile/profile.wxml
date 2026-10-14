@@ -9,7 +9,14 @@
 
     <view wx:if="{{loading}}" class="text-muted">加载中…</view>
 
-    <view wx:elif="{{elders.length === 0}}" class="empty" style="padding:48rpx 0">
+    <!-- 加载失败：与「还没有老人档案」区分开 -->
+    <view wx:elif="{{error}}" class="empty" style="padding:48rpx 0;">
+      <view class="empty-title">加载失败</view>
+      <view class="empty-desc err-msg">{{error}}</view>
+      <button class="btn btn-primary" bindtap="onRetry" style="margin-top:32rpx;">重试</button>
+    </view>
+
+    <view wx:elif="{{elders.length === 0}}" class="empty" style="padding:48rpx 0;">
       <view class="empty-desc">添加档案后，可以把药盒关联到具体的人</view>
     </view>
 
@@ -42,13 +49,17 @@
   <view class="card">
     <view class="card-title">
       <text>用药提醒推送</text>
-      <text class="more" wx:if="{{notifyConfigured}}">剩余 {{notifyQuota}} 次</text>
+      <text class="more" wx:if="{{notifyConfigured && !notifyUnknown}}">剩余 {{notifyQuota}} 次</text>
     </view>
 
     <view class="notify-box {{notifyLow ? 'notify-low' : ''}}">
       <view class="notify-text">
         <block wx:if="{{!notifyConfigured}}">
           还没配置订阅消息模板，去小程序后台申请后填到 utils/subscribe.js
+        </block>
+        <block wx:elif="{{notifyUnknown}}">
+          额度查询失败（可能是网络问题）。这不代表额度用完了 ——
+          下拉刷新可以重试。
         </block>
         <block wx:elif="{{notifyQuota <= 0}}">
           推送额度用完了。现在父母漏服药时，你<text class="text-bold">不会</text>收到微信通知，只能自己打开小程序看。
@@ -99,7 +110,7 @@
     </view>
   </view>
 
-  <view style="height:60rpx"></view>
+  <view style="height:60rpx;"></view>
 
   <!-- 编辑面板 -->
   <view wx:if="{{showEditor}}" class="mask" bindtap="onCloseEditor">

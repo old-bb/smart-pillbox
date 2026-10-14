@@ -74,14 +74,21 @@ function truncate(s, n) {
 
 exports.main = async (event = {}) => {
   // 定时触发器传进来的 event 形如 { Type: 'Timer', TriggerName: 'notifyTimer' }
-  const action = event.action || (event.Type === 'Timer' ? 'sendPending' : '')
+  const isTimer = event.Type === 'Timer'
+  const action = event.action || (isTimer ? 'sendPending' : '')
+  const { OPENID } = cloud.getWXContext()
 
   try {
     switch (action) {
+      // 定时器没有 OPENID，走白名单；客户端调用则必须已登录
       case 'sendPending':
+        if (!isTimer && !OPENID) return { code: 401, msg: '未登录' }
         return await sendPending(event)
+      // 只能给自己名下的预警发，否则任意用户都能
+      // 消耗他人的订阅额度、打扰他人
       case 'sendNow':
-        return await sendNow(event)
+        if (!OPENID) return { code: 401, msg: '未登录' }
+        return await sendNow(OPENID, event)
       case 'addQuota':
         return await addQuota(event)
       case 'getQuota':
@@ -185,11 +192,17 @@ async function sendOne(alert) {
   }
 }
 
-/** 手动发一条指定预警，调试用 */
-async function sendNow(event) {
+/** 手动发一条指定预警。只能发自己名下的，用于调试。 */
+async function sendNow(openid, event) {
   if (!event.alertId) return { code: 400, msg: '缺少 alertId' }
   const res = await db.collection('alerts').doc(event.alertId).get().catch(() => null)
   if (!res || !res.data) return { code: 404, msg: '预警不存在' }
+
+  // 归属校验：没有这一步，任何登录用户拿到 alertId 就能
+  // 给别人推送、扣掉对方的订阅额度、并把对方的预警标记成已处理
+  if (res.data.ownerOpenid !== openid) {
+    return { code: 403, msg: '无权操作该预警' }
+  }
 
   const r = await sendOne(res.data)
   if (r.ok) {

@@ -87,7 +87,19 @@ async function listForDevice(event) {
   const { deviceId, token } = event
   if (!deviceId) return { code: 400, msg: '缺少 deviceId' }
 
-  const EXPECTED = process.env.DEVICE_TOKEN || 'zhihyao-dev-token'
+  // 未配置令牌时一律拒绝（fail closed）。
+  //
+  // 这里原先有个 'zhihyao-dev-token' 作为默认值 —— 但本仓库是公开的，
+  // 等于把线上凭证写在明面上：任何人克隆仓库就能伪造服药记录、
+  // 读取用药计划、伪造设备在线状态。轮换 AppSecret 也挡不住。
+  //
+  // 正确做法是在云开发控制台为这个函数配置环境变量 DEVICE_TOKEN，
+  // 值用一串足够长的随机字符，硬件端在 secret.json 里同步填同样的值。
+  const EXPECTED = process.env.DEVICE_TOKEN
+  if (!EXPECTED) {
+    console.error('[plan] 未配置 DEVICE_TOKEN 环境变量，拒绝所有设备请求')
+    return { code: 500, msg: '服务端未配置设备令牌' }
+  }
   if (token !== EXPECTED) {
     console.warn('[plan] 设备鉴权失败', deviceId)
     return { code: 403, msg: '设备鉴权失败' }

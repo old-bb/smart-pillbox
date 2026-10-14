@@ -125,13 +125,38 @@ class Scheduler:
             # 拉取失败就沿用旧计划，不要清空 —— 断网时药盒必须照常工作
             self._say('[调度] 拉取计划失败，继续使用本地已有的计划')
             return
+
+        changed = self._plans_digest(plans) != self._plans_digest(self.plans)
         self.plans = plans
+
         active = [p for p in plans if p.get('active', True)]
         self._say(f'[调度] 已同步 {len(active)} 个生效计划')
         for p in active:
             times = '、'.join(p.get('times', []))
-            print(f'        {p.get("bayIndex", 0) + 1}号仓 '
-                  f'{p.get("medicineName", "")}  {times}')
+            self._say(f'        {p.get("bayIndex", 0) + 1}号仓 '
+                      f'{p.get("medicineName", "")}  {times}')
+
+        # 计划变了就立刻重建当天的时点表。
+        # 原先只在跨天时重建，导致当天在云端改的计划要到第二天才生效 ——
+        # 药盒会继续按旧时间播报旧药名，有吃错药的风险。
+        if changed and self._day:
+            self._say('[调度] 检测到计划变更，重建当天时点表')
+            self._rebuild_slots(self._day)
+
+    @staticmethod
+    def _plans_digest(plans):
+        """把计划压成一个可比较的字符串，用来判断有没有变化"""
+        items = []
+        for p in plans or []:
+            if not p.get('active', True):
+                continue
+            items.append((
+                str(p.get('_id', '')),
+                int(p.get('bayIndex', 0)),
+                str(p.get('medicineName', '')),
+                ','.join(p.get('times', []) or []),
+            ))
+        return repr(sorted(items))
 
     # ══════════════════════════════════════════════════════════
     #  时点管理
@@ -144,20 +169,44 @@ class Scheduler:
             return
 
         self._day = today
-        self._slots = {}
         self._done = set()
+        self._rebuild_slots(today)
 
+    def _rebuild_slots(self, day):
+        """
+        按当前 self.plans 重建指定日期的时点表。
+
+        两个调用时机：跨天时全新生成；当天云端计划变更后立即重建。
+        已在 _done 里的时点不会复活（重建不等于可以重放已处理的时点），
+        正在提醒中的那个时点也会保留，否则它会被凭空抹掉。
+        """
+        slots = {}
         for p in self.plans:
             if not p.get('active', True):
                 continue
             for t in p.get('times', []):
-                s = Slot(p, t, today)
-                self._slots[s.key] = s
+                s = Slot(p, t, day)
+                if s.key not in self._done:
+                    slots[s.key] = s
 
-        self._say(f'[调度] {today} 共 {len(self._slots)} 个服药时点')
+        # 保留正在提醒的时点 —— 它的计划可能刚被云端删掉或停用，
+        # 但那一次提醒必须走完
+        if self.active is not None and self.active.date_str == day:
+            slots[self.active.key] = self.active
+
+        self._slots = slots
+        self._say(f'[调度] {day} 共 {len(self._slots)} 个服药时点')
 
     def _check_due(self, now):
-        """有到点的就启动提醒"""
+        """
+        有到点的就启动提醒。
+
+        触发窗口是 [到点前 2 秒, 到点后 REMIND_TIMEOUT] —— 不是最初那个
+        只有 5 秒的窄窗口。窄窗口会漏提醒：两个药仓同一分钟到点时，
+        等第一个提醒走完（取药或超时都要几十秒以上），第二个早就越过
+        窗口了，于是它永远不提醒、也不上报，120 秒后被静默标记成已处理。
+        主循环里任何阻塞（网络请求、语音合成）同样会造成这种漏提醒。
+        """
         if self.active is not None:
             return   # 一次只处理一个，避免同时响好几个
 
@@ -166,13 +215,14 @@ class Scheduler:
             if key in self._done:
                 continue
             delta = (now - slot.scheduled_at).total_seconds()
-            # 到点后 0~5 秒内触发（给秒级误差留余量）
-            if -2 <= delta <= 5:
-                self._start_reminder(slot)
-                return
-            # 已经错过太久的，直接标记跳过，不补提醒
+            # 已经错过太久的，不再补提醒
             if delta > config.REMIND_TIMEOUT:
                 self._done.add(key)
+                continue
+            # 到点就提醒。迟了几秒也照提醒，比不提醒强
+            if delta >= -2:
+                self._start_reminder(slot)
+                return
 
     # ══════════════════════════════════════════════════════════
     #  提醒过程
@@ -233,41 +283,54 @@ class Scheduler:
 
         # ── 超时 ──
         if elapsed > config.REMIND_TIMEOUT:
-            self._missed(slot)
+            if self._lid_was_open:
+                # 盖子一直开着 —— 老人很可能正在取药，或者拿完忘了合盖。
+                # 这种情况绝不能判漏服：明明吃了却告诉子女没吃，比漏报更糟。
+                self._confirm(slot, 'taken',
+                              reason='超过时限但药仓一直开着，按已取药处理')
+            else:
+                self._missed(slot)
 
     def _confirm(self, slot, event_type, reason=''):
-        """老人取药了"""
-        self._say(f'[提醒] 已确认（{reason}）')
+        """老人取药了。无论中间出什么错，都必须把 active 清干净。"""
+        try:
+            self._say(f'[提醒] 已确认（{reason}）')
 
-        # 视觉二次确认：比对取药前后的药片数量
-        if event_type == 'taken' and self.vision is not None and self._before_frame is not None:
-            frame = self.hw.snapshot()
-            if frame is not None:
-                before = self.vision.count_pills(self._before_frame, slot.bay)
-                after = self.vision.count_pills(frame, slot.bay)
-                if before is not None and after is not None and after < before:
-                    event_type = 'vision_confirmed'
-                    self._say(f'[视觉] 药片 {before} → {after} 片，确认已取走')
-                else:
-                    self._say(f'[视觉] 数量没变化（{before} → {after}），'
-                          f'可能只是开盖看了看。仍按传感器记录上报')
+            # 视觉二次确认：比对取药前后的药片数量
+            if (event_type == 'taken' and self.vision is not None
+                    and self._before_frame is not None):
+                frame = self.hw.snapshot()
+                if frame is not None:
+                    before = self.vision.count_pills(self._before_frame, slot.bay)
+                    after = self.vision.count_pills(frame, slot.bay)
+                    if before is not None and after is not None and after < before:
+                        event_type = 'vision_confirmed'
+                        self._say(f'[视觉] 药片 {before} → {after} 片，确认已取走')
+                    else:
+                        self._say(f'[视觉] 数量没变化（{before} → {after}），'
+                                  f'可能只是开盖看了看。仍按传感器记录上报')
 
-        self.hw.leds_off()
-        cloud.report_event(slot.bay, event_type)
-
-        self._done.add(slot.key)
-        self.active = None
-        self._before_frame = None
+            cloud.report_event(slot.bay, event_type)
+        finally:
+            # 收尾必须无条件执行。原先如果上报或播报抛异常，
+            # self.active 会永远非空 → _check_due 一直提前返回 →
+            # 调度器彻底卡死，之后所有时点都不再提醒。
+            self.hw.leds_off()
+            self._done.add(slot.key)
+            self.active = None
+            self._before_frame = None
 
     def _missed(self, slot):
         """超时未取，本地判定为漏服并上报"""
-        self._say(f'[提醒] 超时未取，判定为漏服')
-        self.hw.leds_off()
-        self.hw.speak(f'{slot.medicine}还没吃，请尽快服用', bay=slot.bay)
-        cloud.report_event(slot.bay, 'missed')
-        self._done.add(slot.key)
-        self.active = None
-        self._before_frame = None
+        try:
+            self._say('[提醒] 超时未取，判定为漏服')
+            self.hw.speak(f'{slot.medicine}还没吃，请尽快服用', bay=slot.bay)
+            cloud.report_event(slot.bay, 'missed')
+        finally:
+            self.hw.leds_off()
+            self._done.add(slot.key)
+            self.active = None
+            self._before_frame = None
 
     # ══════════════════════════════════════════════════════════
     #  周期性任务

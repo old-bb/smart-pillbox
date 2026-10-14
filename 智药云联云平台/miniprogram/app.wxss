@@ -123,6 +123,15 @@ page {
   transition: width 0.4s ease;
 }
 
+/* ── 错误状态 ── */
+/* 加载失败必须和「空数据」长得不一样，否则接口故障会被误认成数据问题 */
+.err-msg {
+  color: #D9534F;
+  font-size: 26rpx;
+  word-break: break-all;
+  margin-bottom: 8rpx;
+}
+
 /* ── 空状态 ── */
 .empty {
   padding: 120rpx 48rpx;

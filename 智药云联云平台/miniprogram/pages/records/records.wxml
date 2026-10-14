@@ -29,7 +29,7 @@
     <view wx:for="{{adherence.byMedicine}}" wx:key="name" class="med-row">
       <view class="med-name">{{item.name}}</view>
       <view class="med-bar">
-        <view class="med-bar-fill" style="width:{{item.score}}%"></view>
+        <view class="med-bar-fill" style="width:{{item.score}}%;"></view>
       </view>
       <view class="med-score">{{item.score}}%</view>
     </view>
@@ -48,6 +48,15 @@
   <!-- 加载中 -->
   <view wx:if="{{loading}}" class="empty">
     <view class="empty-title">正在加载…</view>
+  </view>
+
+  <!-- 加载失败：与「还没有服药记录」区分开 -->
+  <view wx:elif="{{error}}" class="card">
+    <view class="empty">
+      <view class="empty-title">加载失败</view>
+      <view class="empty-desc err-msg">{{error}}</view>
+      <button class="btn btn-primary" bindtap="onRetry" style="margin-top:40rpx;">重试</button>
+    </view>
   </view>
 
   <!-- 空 -->

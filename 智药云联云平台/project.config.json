@@ -2,8 +2,8 @@
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",
   "projectname": "智药云联",
-  "description": "银发守护·智药云联 —— 子女端云平台（appid 请填你自己的小程序 AppID，注册见 README 第三节步骤 1）",
-  "appid": "wx0000000000000000",
+  "description": "银发守护·智药云联 —— 子女端云平台",
+  "appid": "wx397363c4f4b4151d",
   "libVersion": "3.5.5",
   "setting": {
     "urlCheck": false,

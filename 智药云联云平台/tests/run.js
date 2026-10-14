@@ -20,9 +20,16 @@ const stub = require('./wx-server-sdk-stub')
 const recordFn = require('../cloudfunctions/record/index.js')
 const analyticsFn = require('../cloudfunctions/analytics/index.js')
 const planFn = require('../cloudfunctions/plan/index.js')
+const notifyFn = require('../cloudfunctions/notify/index.js')
+
+// 设备令牌现在必须由环境变量提供，代码里【故意没有默认值】——
+// 本仓库是公开的，写死的字面量等于把线上凭证公开出去。
+// 测试这里显式设一个，模拟"云端已经配好环境变量"的正常状态。
+const DEVICE_TOKEN = 'test-device-token'
+process.env.DEVICE_TOKEN = DEVICE_TOKEN
 
 const OPENID = 'test-openid'
-const TOKEN = 'zhihyao-dev-token'
+const TOKEN = DEVICE_TOKEN
 
 // ── 断言工具 ──────────────────────────────────────────────
 let pass = 0, fail = 0
@@ -362,6 +369,131 @@ async function main() {
   stub.__setOpenid(OPENID)
   r = await deviceFn.main({ action: 'list' })
   check('已登录调用 list 正常', r.code, 0)
+
+  // ══════════════════════════════════════════════════════════
+  //  以下是回归测试：每条都对应一个真实出现过的缺陷，
+  //  目的不是证明代码对，而是防止它再一次不对。
+  // ══════════════════════════════════════════════════════════
+
+  section('十、设备上报漏服（回归）')
+
+  // 背景：硬件端在提醒超时后会发 eventType='missed'。
+  // 云端原先没有这个分支，走 classify() 按时间差判定 ——
+  // 超时上报发生在计划后约 2 分钟，落在 ±30 分钟窗口内，
+  // 于是「漏服」被记成「按时」，还照扣库存、不产生预警。
+
+  seedBase()
+  r = await report('missed', bj(2026, 9, 24, 8, 2))
+  check('超时 2 分钟上报漏服 → 记为 missed', r.data.status, 'missed')
+
+  plan = stub.__store.plans.find(p => p._id === 'plan1')
+  check('  漏服不扣库存（药没被取走）', plan.stock, 30)
+
+  const deviceMissedRecs = stub.__store.records.filter(x => x.planId === 'plan1')
+  check('  写入了一条记录', deviceMissedRecs.length, 1)
+  check('  记录来源标记为 device', deviceMissedRecs[0].source, 'device')
+  check('  没有实际服药的时刻', deviceMissedRecs[0].actualAt, null)
+
+  const missedAlerts = (stub.__store.alerts || []).filter(a => a.type === 'missed_dose')
+  check('  产生了漏服预警', missedAlerts.length, 1)
+  check('  预警带药品名（订阅消息要用）', missedAlerts[0].medicineName, '苯磺酸氨氯地平片')
+  check('  预警带药箱名（订阅消息要用）', missedAlerts[0].deviceName, '测试药盒')
+  check('  预警未标记已推送', missedAlerts[0].notified, false)
+
+  // 漏服不能被后来的「按时」上报覆盖
+  seedBase()
+  await report('missed', bj(2026, 9, 24, 8, 2))
+  r = await report('taken', bj(2026, 9, 24, 8, 3))
+  check('重复上报不覆盖已有的漏服记录', r.data.status, 'missed')
+  check('  也不会重复扣库存',
+        stub.__store.plans.find(p => p._id === 'plan1').stock, 30)
+
+  // 依从性要如实反映漏服。
+  // 注意这里必须用「今天」——adherence 只统计最近 7 天，
+  // 用固定日期会因为落到窗口外而查不到记录（这个测试本身就是这么发现的）
+  seedBase()
+  const td = bjTodayStr().split('-').map(Number)
+  await report('missed', bj(td[0], td[1], td[2], 8, 2))
+  const adhMissed = await analyticsFn.main({ action: 'adherence', days: 7 })
+  check('依从性把漏服计 0 分', adhMissed.data.score, 0)
+  check('  漏服次数统计正确', adhMissed.data.byStatus.missed, 1)
+
+  section('十一、推送鉴权（回归）')
+
+  // 背景：notify.sendNow 原先既不校验登录、也不校验预警归属，
+  // 任何登录用户拿到 alertId 就能给别人推送、扣掉对方的订阅额度。
+
+  seedBase()
+  stub.__seed('alerts', [{ _id: 'alert-victim', ownerOpenid: 'victim-openid', type: 'missed_dose' }])
+
+  stub.__setOpenid('attacker-openid')
+  r = await quiet(() => notifyFn.main({ action: 'sendNow', alertId: 'alert-victim' }))
+  check('不能推送别人名下的预警', r.code, 403)
+
+  stub.__setOpenid('')
+  r = await quiet(() => notifyFn.main({ action: 'sendNow', alertId: 'alert-victim' }))
+  check('未登录不能调用 sendNow', r.code, 401)
+
+  // 定时器没有 OPENID，它调用 sendPending 必须放行
+  stub.__setOpenid('')
+  r = await quiet(() => notifyFn.main({ Type: 'Timer', TriggerName: 'notifyTimer' }))
+  check('定时触发器调用 sendPending 放行', r.code === 0 || r.code === 500, true)
+
+  section('十二、设备令牌未配置时拒绝一切（回归）')
+
+  // 背景：环境变量没配时，代码原先会回退到公开仓库里的字面量
+  // 'zhihyao-dev-token' —— 那等于把线上凭证写在明面上。
+  // 现在必须 fail closed。
+
+  const savedToken = process.env.DEVICE_TOKEN
+
+  seedBase()
+  delete process.env.DEVICE_TOKEN
+  r = await quiet(() => report('taken', bj(2026, 9, 24, 8, 5)))
+  check('未配置令牌时拒绝上报', r.code, 500)
+  check('  且不写入任何记录',
+        (stub.__store.records || []).length, 0)
+
+  seedBase()
+  delete process.env.DEVICE_TOKEN
+  r = await quiet(() => deviceFn.main({
+    action: 'heartbeat', deviceId: 'BOX001', token: '随便什么'
+  }))
+  check('未配置令牌时拒绝心跳', r.code, 500)
+
+  // 恢复，后面的测试还要用
+  process.env.DEVICE_TOKEN = savedToken
+
+  section('十三、模拟上报走用户登录态（回归）')
+
+  // 小程序里的「模拟上报」原先直接发设备令牌 ——
+  // 但客户端代码能被反编译，等于把令牌公开。
+  // 改成走 OPENID + 设备归属校验。
+
+  seedBase()
+  stub.__setOpenid(OPENID)              // seedBase 里 devices[0] 属于 OPENID
+  r = await recordFn.main({
+    action: 'simulateReport', deviceId: 'BOX001', bayIndex: 0,
+    eventType: 'vision_confirmed'
+  })
+  check('设备主人可以模拟上报', r.code, 0)
+
+  seedBase()
+  stub.__setOpenid('someone-else')
+  r = await quiet(() => recordFn.main({
+    action: 'simulateReport', deviceId: 'BOX001', bayIndex: 0,
+    eventType: 'vision_confirmed'
+  }))
+  check('不能给别人的设备模拟上报', r.code, 403)
+
+  seedBase()
+  stub.__setOpenid('')
+  r = await quiet(() => recordFn.main({
+    action: 'simulateReport', deviceId: 'BOX001', bayIndex: 0
+  }))
+  check('未登录不能模拟上报', r.code, 401)
+
+  stub.__setOpenid(OPENID)
 
   // ── 汇总 ──
   console.log('\n' + '─'.repeat(50))

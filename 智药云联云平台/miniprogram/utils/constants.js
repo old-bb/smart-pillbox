@@ -17,6 +17,7 @@ const STATUS_MAP = {
 const SOURCE_MAP = {
   sensor:           '药盒感应',
   vision_confirmed: '视觉确认',
+  device:           '药盒判定',   // 药盒本地判定漏服后主动上报
   manual:           '手动补录',
   auto:             '系统判定'
 }

@@ -61,10 +61,12 @@ const plan = {
 
 const record = {
   list: (params) => call('record', { action: 'list', ...params }),
-  // 供硬件端调用，小程序里一般不用
-  report: (params) => call('record', { action: 'report', ...params }),
   saveManual: (params) => call('record', { action: 'saveManual', ...params }),
-  syncMissed: (days = 7) => call('record', { action: 'syncMissed', days }, { silent: true })
+  syncMissed: (days = 7) => call('record', { action: 'syncMissed', days }, { silent: true }),
+  // 模拟上报：没有硬件时演示完整流程用。
+  // 走用户登录态（OPENID）而不是设备令牌 —— 客户端代码可被反编译，
+  // 把设备令牌放进小程序等于公开它。
+  simulateReport: (params) => call('record', { action: 'simulateReport', ...params })
 }
 
 const dashboard = {

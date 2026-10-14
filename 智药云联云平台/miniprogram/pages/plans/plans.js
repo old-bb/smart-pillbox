@@ -21,6 +21,7 @@ function emptyForm() {
 Page({
   data: {
     loading: true,
+    error: '',
     plans: [],
     devices: [],
     mealRelations: MEAL_RELATIONS,
@@ -43,17 +44,25 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     return Promise.all([api.plan.list(), api.device.list()])
       .then(([plans, devices]) => {
         this.setData({
           loading: false,
+          error: '',
           devices,
           // 传 devices 进去，此时 this.data.devices 还是旧值
           plans: plans.map(p => this.decorate(p, devices))
         })
       })
-      .catch(() => this.setData({ loading: false }))
+      .catch(err => {
+        // 加载失败要显式报错，不能落进「还没有用药计划」的空状态
+        this.setData({ loading: false, error: (err && err.message) || '加载失败' })
+      })
+  },
+
+  onRetry() {
+    this.load()
   },
 
   decorate(p, devices) {

@@ -4,6 +4,15 @@
     <view class="empty-title">正在加载…</view>
   </view>
 
+  <!-- 加载失败：与「还没有绑定药盒」区分开 -->
+  <view wx:elif="{{error}}" class="card">
+    <view class="empty">
+      <view class="empty-title">加载失败</view>
+      <view class="empty-desc err-msg">{{error}}</view>
+      <button class="btn btn-primary" bindtap="onRetry" style="margin-top:40rpx;">重试</button>
+    </view>
+  </view>
+
   <block wx:else>
     <view wx:if="{{devices.length === 0}}" class="empty">
       <view class="empty-title">还没有绑定药盒</view>
@@ -51,7 +60,7 @@
       </view>
     </view>
 
-    <view style="height:160rpx"></view>
+    <view style="height:160rpx;"></view>
   </block>
 
   <view class="fab-bar">

@@ -13,6 +13,7 @@ const FILTERS = [
 Page({
   data: {
     loading: true,
+    error: '',
     filters: FILTERS,
     activeFilter: '',
     groups: [],      // 按日期分组
@@ -36,15 +37,21 @@ Page({
   },
 
   reload() {
-    this.setData({ loading: true, page: 1 })
+    this.setData({ loading: true, error: '', page: 1 })
     return Promise.all([
       this.fetchRecords(1, true),
       api.analytics.adherence(30).catch(() => null)
     ]).then(([, adh]) => {
-      this.setData({ loading: false, adherence: adh })
-    }).catch(() => {
-      this.setData({ loading: false })
+      this.setData({ loading: false, error: '', adherence: adh })
+    }).catch(err => {
+      // 加载失败要显式报错，不能落进「还没有服药记录」的空状态 ——
+      // 那会把接口故障伪装成「父母从没吃过药」
+      this.setData({ loading: false, error: (err && err.message) || '加载失败' })
     })
+  },
+
+  onRetry() {
+    this.reload()
   },
 
   fetchRecords(page, replace) {

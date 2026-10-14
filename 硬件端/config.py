@@ -20,29 +20,93 @@ USE_MOCK = os.environ.get('ZHIHYAO_MOCK', '1') != '0'
 
 
 # ══════════════════════════════════════════════════════════════
+#  本机密钥文件
+# ══════════════════════════════════════════════════════════════
+#
+# secret.json 存本机专有的凭证，已在 .gitignore 里，不会进仓库。
+#
+#     {"appsecret": "小程序AppSecret", "devicetoken": "设备令牌"}
+#
+# 两个值都不是必须写在同一个文件里 —— 也可以用环境变量给。
+
+_SECRET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'secret.json')
+_SECRET = {}
+if os.path.exists(_SECRET_FILE):
+    try:
+        import json as _json
+        with open(_SECRET_FILE, encoding='utf-8') as _f:
+            _loaded = _json.load(_f)
+        if isinstance(_loaded, dict):
+            _SECRET = _loaded
+        else:
+            print(f'[配置] {_SECRET_FILE} 的内容不是 JSON 对象，已忽略')
+    except ValueError as e:
+        # 把「文件存在但坏了」和「文件不存在」区分开 ——
+        # 前者会让配置静默失效，必须让用户看见
+        print(f'[配置] 读不了 {_SECRET_FILE}：{e}')
+        print('       文件格式不对，设备会退到本地运行模式（数据不上报）')
+    except OSError as e:
+        print(f'[配置] 打不开 {_SECRET_FILE}：{e}')
+
+
+# ══════════════════════════════════════════════════════════════
 #  设备身份
 # ══════════════════════════════════════════════════════════════
 
 # 药盒编号。要和云端 devices 集合里的 deviceId 一致
 DEVICE_ID = os.environ.get('ZHIHYAO_DEVICE_ID', 'BOX-TEST01')
 
-# 设备上报用的令牌。必须和云函数 record 里的 DEVICE_TOKEN 一致
-# ⚠️ 这只是中期阶段的占位方案。正式做法是设备端用密钥签名，服务端验签
-DEVICE_TOKEN = os.environ.get('ZHIHYAO_DEVICE_TOKEN', 'zhihyao-dev-token')
-
-
-# ══════════════════════════════════════════════════════════════
-#  云端地址
-# ══════════════════════════════════════════════════════════════
-
-# 云函数的 HTTP 触发地址。
-# 获取方式：云开发控制台 → 云函数 → record → 「HTTP 访问服务」→ 复制路径
-# 形如 https://<环境ID>.service.tcloudbase.com/<路径>
+# 设备上报用的令牌。必须和云函数的 DEVICE_TOKEN 环境变量一致。
 #
-# ⚠️ 还没配置的话留空，程序会自动降级成"只本地运行、不上报"
+# ⚠️ 这里【故意没有默认值】。
+#
+# 原先默认是 'zhihyao-dev-token'，但本仓库是公开的 —— 等于把线上凭证
+# 写在明面上，任何人克隆仓库就能伪造服药记录、读取用药计划。
+# 所以现在改成：没配置就不上报（进程会打印醒目提示）。
+#
+# 配置方法（二选一）：
+#   1. secret.json 里加 "devicetoken": "xxx"
+#   2. 环境变量 ZHIHYAO_DEVICE_TOKEN
+#
+# 云函数那边也要设：云开发控制台 → 三个设备接口函数（record / device / plan）
+# → 配置 → 环境变量 → DEVICE_TOKEN = 同样的值
+DEVICE_TOKEN = (os.environ.get('ZHIHYAO_DEVICE_TOKEN')
+                or _SECRET.get('devicetoken', ''))
+
+
+# ══════════════════════════════════════════════════════════════
+#  云端对接
+# ══════════════════════════════════════════════════════════════
+#
+# 两种方式，程序自动选：
+#
+#   方式一（推荐）：服务端 API —— 直接调云函数，不需要 HTTP 网关。
+#                   免费、免域名、免备案，免费环境就能用。
+#                   需要填 WX_APPSECRET。
+#
+#   方式二：HTTP 访问服务 —— 需要云开发环境的 HTTP 网关。
+#           当前免费体验版控制台里没有这个入口，暂时用不了。
+#           等以后能用了，把 CLOUD_BASE_URL 填上即可自动切换。
+#
+# 两者都不填 → 程序进入本地运行模式，数据不上传（调试时能用）
+
+# 小程序 AppID。不是机密（任何人用你们的小程序都能看到）
+WX_APPID = os.environ.get('ZHIHYAO_APPID', 'wx397363c4f4b4151d')
+
+# 云开发环境 ID。也不是机密，写在小程序代码里
+CLOUD_ENV = os.environ.get('ZHIHYAO_ENV', 'cloud1-d4gkyr16k10bd7e23')
+
+# ⚠️ AppSecret 是小程序的最高权限钥匙，绝不能提交到 git。
+#    填法（二选一）：
+#      1. secret.json 里加 "appsecret": "xxx"
+#      2. 环境变量 ZHIHYAO_APPSECRET
+WX_APPSECRET = (os.environ.get('ZHIHYAO_APPSECRET')
+                or _SECRET.get('appsecret', ''))
+
+# 方式二用：HTTP 访问服务的公网地址。留空则走方式一
 CLOUD_BASE_URL = os.environ.get('ZHIHYAO_CLOUD_URL', '')
 
-# 各功能对应的云函数路径（按你的 HTTP 触发配置改）
+# 方式二用：各功能对应的云函数路径
 CLOUD_PATHS = {
     'record': 'record',      # 上报服药事件
     'device': 'device',      # 心跳、药仓配置
@@ -72,6 +136,15 @@ HTTP_RETRY = 3
 #
 # 编号规则：填 gpiod 的【line number】（gpioinfo 输出里的第一列），
 #          不是物理引脚序号，也不是 BCM 编号。
+#
+# ⚠️ 如果 libgpiod 的 Python 绑定装不上、程序退到 sysfs 模式，
+#    上面的 line number 会被自动换算成 sysfs 的全局 GPIO 号
+#    （全局号 = 芯片基址 + line），换算依据是下面这一项。
+#
+#    查看板子上有哪些芯片：ls /sys/class/gpio/  或  gpiodetect
+#    例如输出是 gpiochip0 和 gpiochip352，那 0 是第一块、1 是第二块。
+#    你要用的 40-pin 引脚在哪块芯片上，就填它的序号。
+GPIO_CHIP_INDEX = 0
 
 # 药仓 LED：每个药仓一颗。索引 0..5 对应 1..6 号仓
 LED_PINS = [1, 2, 3, 4, 5, 6]

@@ -53,12 +53,19 @@ function request() {
   })
 }
 
-/** 查询剩余可推送次数 */
+/**
+ * 查询剩余可推送次数。
+ *
+ * ⚠️ 查询失败返回 null，**不要返回 0**。
+ * 返回 0 会让界面显示「额度用完了，父母漏服你不会收到通知」——
+ * 一个接口故障被伪装成了紧急的业务告警，是吓唬人也是误导。
+ * 调用方按 null 显示「查询失败」。
+ */
 function quota() {
-  if (!isConfigured()) return Promise.resolve(0)
+  if (!isConfigured()) return Promise.resolve(null)
   return api.notify.getQuota()
-    .then(d => d.quota || 0)
-    .catch(() => 0)
+    .then(d => (typeof d.quota === 'number' ? d.quota : null))
+    .catch(() => null)
 }
 
 /** 额度低于这个值时提示用户补充 */

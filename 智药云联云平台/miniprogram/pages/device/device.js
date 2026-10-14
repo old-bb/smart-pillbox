@@ -6,6 +6,7 @@ const fmt = require('../../utils/format')
 Page({
   data: {
     loading: true,
+    error: '',
     devices: [],
     elders: [],
 
@@ -30,11 +31,12 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     return Promise.all([api.device.list(), api.elder.list()])
       .then(([devices, elders]) => {
         this.setData({
           loading: false,
+          error: '',
           elders,
           devices: devices.map(d => ({
             ...d,
@@ -44,7 +46,15 @@ Page({
           }))
         })
       })
-      .catch(() => this.setData({ loading: false }))
+      .catch(err => {
+        // 加载失败要显式报错，不能落进「还没有绑定药盒」的空状态 ——
+        // 那会把接口故障伪装成数据问题，让人以为药盒被解绑了
+        this.setData({ loading: false, error: (err && err.message) || '加载失败' })
+      })
+  },
+
+  onRetry() {
+    this.load()
   },
 
   // ── 绑定 ──────────────────────────────────────
@@ -165,11 +175,12 @@ Page({
 
   reportSimulated(deviceId, bayIndex) {
     wx.showLoading({ title: '上报中…' })
-    api.record.report({
+    // 走 simulateReport 而不是设备用的 report ——
+    // 后者要设备令牌，而令牌不该出现在客户端代码里
+    api.record.simulateReport({
       deviceId,
       bayIndex,
-      eventType: 'vision_confirmed',
-      token: 'zhihyao-dev-token'
+      eventType: 'vision_confirmed'
     }).then(data => {
       wx.hideLoading()
       if (data && data.ignored) {

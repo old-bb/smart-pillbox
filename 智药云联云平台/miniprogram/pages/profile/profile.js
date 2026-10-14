@@ -10,6 +10,7 @@ function emptyForm() {
 Page({
   data: {
     loading: true,
+    error: '',
     elders: [],
     conditions: CONDITION_OPTIONS,
 
@@ -23,7 +24,8 @@ Page({
     // 订阅消息推送
     notifyConfigured: false,
     notifyQuota: 0,
-    notifyLow: false
+    notifyLow: false,
+    notifyUnknown: false    // 额度查询失败，不能当成「额度为 0」
   },
 
   onShow() {
@@ -35,7 +37,13 @@ Page({
   loadQuota() {
     this.setData({ notifyConfigured: subscribe.isConfigured() })
     return subscribe.quota().then(q => {
-      this.setData({ notifyQuota: q, notifyLow: q <= subscribe.LOW_QUOTA })
+      // q 为 null 表示查询失败。不能当成 0 ——
+      // 否则会把接口故障显示成「额度用完、你收不到漏服通知」
+      this.setData({
+        notifyQuota: q === null ? 0 : q,
+        notifyUnknown: q === null,
+        notifyLow: q !== null && q <= subscribe.LOW_QUOTA
+      })
     })
   },
 
@@ -75,17 +83,25 @@ Page({
   },
 
   load() {
-    this.setData({ loading: true })
+    this.setData({ loading: true, error: '' })
     return Promise.all([
       api.elder.list(),
       api.analytics.alerts({ pageSize: 1, onlyUnread: true }).catch(() => null)
     ]).then(([elders, alerts]) => {
       this.setData({
         loading: false,
+        error: '',
         elders,
         alertCount: alerts ? alerts.unread : 0
       })
-    }).catch(() => this.setData({ loading: false }))
+    }).catch(err => {
+      // 加载失败要显式报错，不能落进「还没有老人档案」的空状态
+      this.setData({ loading: false, error: (err && err.message) || '加载失败' })
+    })
+  },
+
+  onRetry() {
+    this.load()
   },
 
   // ── 档案编辑 ──────────────────────────────────

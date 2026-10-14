@@ -221,11 +221,16 @@ class OrangePiHardware(Hardware):
         if not (0 <= bay < len(config.LID_PINS)):
             return False
         v = self._gpio.read(config.LID_PINS[bay])
+        if v is None:
+            return False   # 读不到当作没开盖，宁可判漏服也不要漏报
         return (not v) if config.LID_ACTIVE_LOW else v
 
     def is_button_pressed(self):
         # 按键接 GPIO 与 GND 之间，内部上拉；按下时读到低电平
-        return not self._gpio.read(config.BUTTON_PIN)
+        v = self._gpio.read(config.BUTTON_PIN)
+        if v is None:
+            return False   # 读不到当作没按 —— 否则提醒刚响就会被误判成已取药
+        return not v
 
     # ── 摄像头 ──
 
@@ -281,6 +286,7 @@ class _GpioBackend:
         self._in_req = None
         self._out_pins = []
         self._in_pins = []
+        self._warned_read = False   # 读失败只提醒一次，避免刷屏
 
         try:
             import gpiod
@@ -292,25 +298,67 @@ class _GpioBackend:
         except ImportError:
             gpiod = None
 
+        # sysfs 模式和 gpiod 模式的【编号空间不同】，必须换算：
+        #   gpiod 用「芯片 + 线号」      gpiochip0 line 17
+        #   sysfs 用「全局 GPIO 号」     gpio17（全局号 = 芯片基址 + 线号）
+        # 板子上通常有两块芯片（比如基址 0 和 352），
+        # 第二块上的 line 5 在 sysfs 里是 357 —— 直接按 5 去找会找错引脚。
+        self._sysfs_base = 0
+
         if self.mode is None:
-            if os.path.isdir('/sys/class/gpio'):
+            chips = self._list_sysfs_chips()
+            if chips:
                 self.mode = 'sysfs'
-                print('[GPIO] libgpiod 不可用，退回 sysfs（已废弃，但能用）')
-                print('       建议安装：sudo apt install -y python3-libgpiod')
+                idx = min(getattr(config, 'GPIO_CHIP_INDEX', 0), len(chips) - 1)
+                self._sysfs_base = chips[idx][1]
+                print('[GPIO] libgpiod 的 Python 绑定不可用，退回 sysfs')
+                print(f'       板上有 {len(chips)} 块芯片：'
+                      + '、'.join(f'{n}(基址 {b})' for n, b in chips))
+                print(f'       使用第 {idx} 块，基址 {self._sysfs_base}，'
+                      f'配置里的 line N 会换算成 gpio{self._sysfs_base}+N')
+                if self._sysfs_base:
+                    print('       ⚠️ 基址不是 0，确认 config.py 的 GPIO_CHIP_INDEX 选对了芯片')
             else:
                 raise RuntimeError(
                     '找不到任何 GPIO 接口。\n'
-                    '请安装：sudo apt install -y python3-libgpiod\n'
+                    '尝试安装：sudo apt install -y python3-libgpiod\n'
                     '或者先用模拟模式跑：ZHIHYAO_MOCK=1 python3 main.py'
                 )
 
-        # 探测 gpiochip。A733 通常只有一个
+        # gpiod 模式下的芯片设备路径
         self._chip_path = '/dev/gpiochip0'
         for i in range(8):
             p = f'/dev/gpiochip{i}'
             if os.path.exists(p):
                 self._chip_path = p
                 break
+
+    @staticmethod
+    def _list_sysfs_chips():
+        """
+        列出 sysfs 里的 gpiochip，返回 [(目录名, 基址), ...]，按基址排序。
+
+        sysfs 的芯片目录直接以基址命名（gpiochip0、gpiochip352），
+        所以目录名本身就是基址，不用再去读 base 文件。
+        """
+        base_dir = '/sys/class/gpio'
+        chips = []
+        try:
+            for name in os.listdir(base_dir):
+                if not name.startswith('gpiochip'):
+                    continue
+                try:
+                    base = int(name[len('gpiochip'):])
+                except ValueError:
+                    continue
+                chips.append((name, base))
+        except OSError:
+            return []
+        return sorted(chips, key=lambda x: x[1])
+
+    def _sysfs_global(self, pin):
+        """把 config 里的 line number 换算成 sysfs 的全局 GPIO 号"""
+        return self._sysfs_base + pin
 
     # ── 输出 ──
 
@@ -331,10 +379,11 @@ class _GpioBackend:
                 line = chip.get_line(p)
                 line.request(consumer='zhihyao-out', type=self._gpiod.LINE_REQ_DIR_OUT)
                 self._out_req[p] = line
-        else:  # sysfs
+        else:  # sysfs —— 注意下面的编号要换算成全局 GPIO 号
             for p in self._out_pins:
-                self._sysfs_export(p)
-                self._sysfs_write(p, 'out')
+                g = self._sysfs_global(p)
+                self._sysfs_export(g)
+                self._sysfs_set_direction(g, 'out')
 
     def write(self, pin, on):
         if self.mode == 'gpiod-v2':
@@ -343,7 +392,7 @@ class _GpioBackend:
         elif self.mode == 'gpiod-v1':
             self._out_req[pin].set_value(1 if on else 0)
         else:
-            self._sysfs_set(pin, '1' if on else '0')
+            self._sysfs_set(self._sysfs_global(pin), '1' if on else '0')
 
     # ── 输入 ──
 
@@ -369,44 +418,61 @@ class _GpioBackend:
                 self._in_req[p] = line
         else:
             for p in self._in_pins:
-                self._sysfs_export(p)
-                self._sysfs_write(p, 'in')
+                g = self._sysfs_global(p)
+                self._sysfs_export(g)
+                self._sysfs_set_direction(g, 'in')
 
     def read(self, pin):
-        if self.mode == 'gpiod-v2':
-            from gpiod.line import Value
-            return self._in_req.get_value(pin) == Value.ACTIVE
-        elif self.mode == 'gpiod-v1':
-            return bool(self._in_req[pin].get_value())
-        else:
-            try:
-                with open(f'/sys/class/gpio/gpio{pin}/value') as f:
+        """
+        读引脚电平。成功返回 True/False，**读不到返回 None**。
+
+        ⚠️ 读不到时必须返回 None，不能返回 False ——
+        按键和霍尔都是低电平有效，把「读失败」当成「低电平」会被
+        解读成「按键一直按着」「盖子一直开着」。前者会让提醒刚响
+        就被判定为已取药（药没吃却记成按时），后者会让提醒永远超时。
+        两种误判里前者更危险，所以调用方对 None 一律按「没触发」处理。
+        """
+        try:
+            if self.mode == 'gpiod-v2':
+                from gpiod.line import Value
+                return self._in_req.get_value(pin) == Value.ACTIVE
+            elif self.mode == 'gpiod-v1':
+                return bool(self._in_req[pin].get_value())
+            else:
+                g = self._sysfs_global(pin)
+                with open(f'/sys/class/gpio/gpio{g}/value') as f:
                     return f.read().strip() == '1'
-            except OSError:
-                return False
+        except Exception as e:
+            if not self._warned_read:
+                print(f'[GPIO] 读引脚 {pin} 失败：{e}')
+                print('       后续同类错误不再重复打印。检查引脚编号与权限。')
+                self._warned_read = True
+            return None
 
     # ── sysfs 辅助 ──
 
-    def _sysfs_export(self, pin):
-        p = f'/sys/class/gpio/gpio{pin}'
+    def _sysfs_export(self, gpio):
+        """导出全局 GPIO 号（不是 config 里的 line number）"""
+        p = f'/sys/class/gpio/gpio{gpio}'
         if not os.path.exists(p):
             try:
                 with open('/sys/class/gpio/export', 'w') as f:
-                    f.write(str(pin))
+                    f.write(str(gpio))
                 time.sleep(0.1)
             except OSError as e:
-                print(f'[GPIO] 导出引脚 {pin} 失败：{e}')
+                print(f'[GPIO] 导出引脚 gpio{gpio} 失败：{e}')
+                print('       换个引脚试试，或者确认它在所用的芯片上')
 
-    def _sysfs_write(self, pin, value):
+    def _sysfs_set_direction(self, gpio, value):
         try:
-            with open(f'/sys/class/gpio/gpio{pin}/direction', 'w') as f:
+            with open(f'/sys/class/gpio/gpio{gpio}/direction', 'w') as f:
                 f.write(value)
         except OSError:
             pass
 
-    def _sysfs_set(self, pin, value):
+    def _sysfs_set(self, gpio, value):
         try:
-            with open(f'/sys/class/gpio/gpio{pin}/value', 'w') as f:
+            with open(f'/sys/class/gpio/gpio{gpio}/value', 'w') as f:
                 f.write(value)
         except OSError:
             pass
